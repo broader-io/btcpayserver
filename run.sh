@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd BTCPayServer/bin/Release/publish/
+cd BTCPayServer/bin/Debug/publish/
 dotnet "BTCPayServer.dll" $@

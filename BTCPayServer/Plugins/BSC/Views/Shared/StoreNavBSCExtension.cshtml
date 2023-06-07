@@ -1,0 +1,11 @@
+@using BTCPayServer.Plugins.BSC.Controllers
+@inject SignInManager<ApplicationUser> SignInManager;
+@inject BTCPayNetworkProvider BTCPayNetworkProvider;
+@{
+    var controller = ViewContext.RouteData.Values["Controller"].ToString();
+    var isBSC = controller.Equals(nameof(BSCStoreController), StringComparison.InvariantCultureIgnoreCase);
+}
+@if (SignInManager.IsSignedIn(User) && BTCPayNetworkProvider.GetAll().OfType<BSCBTCPayNetwork>().Any())
+{
+    <a class="nav-link @(isBSC ? "active" : string.Empty)" asp-route-storeId="@this.Context.GetRouteValue("storeId")" asp-action="GetStoreBSCPaymentMethods" asp-controller="BSCStore">BSC</a>
+}

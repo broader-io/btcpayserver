@@ -1,0 +1,94 @@
+@using BTCPayServer.Views.Server
+@using System.Net.Http
+@using BTCPayServer.Abstractions.Extensions
+@model BTCPayServer.Plugins.ProsusPay.ProsusPayConfiguration
+@inject BTCPayNetworkProvider BTCPayNetworkProvider;
+@inject IHttpClientFactory HttpClientFactory;
+@{
+    Layout = "/Views/Shared/_NavLayout.cshtml";
+    ViewData["NavPartialName"] = "/Views/UIServer/_Nav.cshtml";
+    ViewBag.MainTitle = "Server settings";
+    ViewData.SetActivePage(ServerNavPages.Policies, $"Prosus Pay Configuration");
+}
+
+@if (!ViewContext.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="text-danger"></div>
+}
+
+<div class="row">
+    <div class="col-xl-8 col-xxl-constrain">
+        <form method="post" class="d-flex flex-column">
+            <h4>Prosus Pay | Crypto coin configuration</h4>
+            <div class="form-group mb-5">
+                <button id="AddCryptoCoinButton" type="submit" name="command" value="new" class="btn btn-link px-0">Add Crypto Coin configuration</button>
+            </div>
+
+            @if (Model.CoinConfiguration.Any())
+            {
+                <div class="list-group list-group-flush mb-2">
+                    @for (var index = 0; index < Model.CoinConfiguration.Count; index++)
+                    {
+                        <div class="list-group-item px-0 pt-3">
+                            <div class="form-group">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <label class="form-label"></label>
+                                    <button type="submit" title="Crypto Coin Configuration" name="command" value="@($"remove:{index}")" class="d-inline-block ms-2 btn text-danger btn-link p-0 mb-2">
+                                        <span class="fa fa-times"></span> Remove Configuration
+                                    </button>
+                                </div>
+                                <label asp-for="CoinConfiguration[index].cryptoCode" class="form-label">Crypto Code</label>
+                                <input asp-for="CoinConfiguration[index].cryptoCode" class="form-control"/>
+                                <span asp-validation-for="CoinConfiguration[index].cryptoCode" class="text-danger"></span>
+
+                                <label asp-for="CoinConfiguration[index].address" class="form-label">Address</label>
+                                <input asp-for="CoinConfiguration[index].address" class="form-control"/>
+                                <span asp-validation-for="CoinConfiguration[index].address" class="text-danger"></span>
+
+                                <label asp-for="CoinConfiguration[index].minPaymentAmount" class="form-label">Minimum Payment Amount</label>
+                                <input asp-for="CoinConfiguration[index].minPaymentAmount" class="form-control"/>
+                                <span asp-validation-for="CoinConfiguration[index].minPaymentAmount" class="text-danger"></span>
+
+                                <label asp-for="CoinConfiguration[index].feeRate" class="form-label">Fee Rate</label>
+                                <input asp-for="CoinConfiguration[index].feeRate" class="form-control"/>
+                                <span asp-validation-for="CoinConfiguration[index].feeRate" class="text-danger"></span>
+
+                                <label asp-for="CoinConfiguration[index].networkFee" class="form-label">Network Fee</label>
+                                <input asp-for="CoinConfiguration[index].networkFee" class="form-control"/>
+                                <span asp-validation-for="CoinConfiguration[index].networkFee" class="text-danger"></span>
+                            </div>
+                            @* <div class="form-group"> *@
+                            @*     <label asp-for="DomainToAppMapping[index].AppId" class="form-label"></label> *@
+                            @*     <select asp-for="DomainToAppMapping[index].AppId" *@
+                            @*             asp-items="@(new SelectList(ViewBag.AppsList, nameof(SelectListItem.Value), nameof(SelectListItem.Text), Model.DomainToAppMapping[index].AppId))" *@
+                            @*             class="form-select w-auto"> *@
+                            @*     </select> *@
+                            @*     <span asp-validation-for="DomainToAppMapping[index].AppId" class="text-danger"></span> *@
+                            @* </div> *@
+                        </div>
+                    }
+                </div>
+                <button type="submit" title="Crypto Coin Configuration" name="command" value="update" class="d-inline-block ms-2 btn text-success btn-link p-0 mb-2">
+                    Save
+                </button>
+            }
+        </form>
+    </div>
+</div>
+
+@* <form method="post"> *@
+@*     <div class="form-group"> *@
+@*         <div class="form-check"> *@
+@*             <label asp-for="MasterBTCAddress" class="form-label"></label> *@
+@*             <input asp-for="MasterBTCAddress" type="text" class="form-control"/> *@
+@*             <span asp-validation-for="MasterBTCAddress" class="text-danger"></span> *@
+@*         </div> *@
+@*         <div class="form-check"> *@
+@*             <label asp-for="MasterProsusAddress" class="form-label"></label> *@
+@*             <input asp-for="MasterProsusAddress" type="text" class="form-control"/> *@
+@*             <span asp-validation-for="MasterProsusAddress" class="text-danger"></span> *@
+@*         </div> *@
+@*     </div> *@
+@* *@
+@*     <button type="submit" class="btn btn-primary" name="command" value="Save" id="saveButton">Save</button> *@
+@* </form> *@

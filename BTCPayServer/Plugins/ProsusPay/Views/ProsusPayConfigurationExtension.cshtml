@@ -1,0 +1,10 @@
+@using BTCPayServer.Plugins.ProsusPay
+@inject SignInManager<ApplicationUser> SignInManager;
+@{
+    var controller = ViewContext.RouteData.Values["Controller"].ToString();
+    var isProsusPay = controller.Equals(nameof(ProsusPayConfigController), StringComparison.InvariantCultureIgnoreCase);
+}
+@if (SignInManager.IsSignedIn(User))
+{
+    <a class="nav-link @(isProsusPay ? "active" : string.Empty)" asp-action="GetProsusPayConfig" asp-controller="ProsusPayConfig">Prosus Pay</a>
+}
