@@ -1,5 +1,103 @@
 # Changelog
 
+## 1.11.2
+
+## Bug fixes
+
+* Language Select box cut off on checkout (#5210) @evanc-ole
+* POS: Multiple fixes (#5228 #5241 #5252) @dennisreimann
+* Greenfield: Fix invoice lookup by capitalized status (#5245) @dennisreimann
+* Fix temporary file downloads for local storage option @Kukks
+
+### Improvements
+
+* POS: Handle flexible price items in cart view (#5238) @dennisreimann
+* POS: Combine search term and category selector (#5241) @dennisreimann
+* Email Rules: Improve validation (#5234) @dennisreimann
+* Receipt improvements (#5239) @dennisreimann
+* Improve invoices status filter (#5248 #5251) @dennisreimann
+
+## 1.11.1
+
+## Bug fixes
+
+* Language Select box cut off on checkout (#5210) @dstrukt
+* POS Cart view malformed when special characters are in items (#5203 #5211) @Kukks
+* Errors creating invoice from public form were not shown in the UI (#5208 #5211) @Kukks
+* Cart view doesn't show item when the amount field is custom (#5204 #5211) @Kukks
+* Can't save the item when adding a new category in POS (#5205 #5211) @Kukks
+
+## 1.11.0
+
+### New Features
+
+* Complete overhaul of Invoice Reporting (#5095 #5155) @NicolasDorier
+* POS Cart redesign (#5109 #5171) @dennisreimann @dstrukt
+* Add product categories to POS apps (#5088 #5078) @NicolasDorier
+* Checkout v2: Play sound when invoice is paid (#5085 #5113) @dennisreimann @webwworthy
+* Add support for ExchangeRateHost and FreeCurrencyRates rate providers (#5166) @Kukks
+
+
+### Bug fixes
+
+* Support NFC on modal (#4251 #5033) @Kukks @dennisreimann
+* Fixed setting of minimum or custom price for LNURL POS items (#5170 #5172) @Kukks
+* Preventing entering of negative tips and discounts in POS (#5192 #5198) @rockstardev
+* Fixing display of amount paid on Receipt page (#5195 #5197) @rockstardev
+* Form invoice amount adjusters, useful for shipping and other addon amounts to the invoice (#5087 #5158) @Kukks @dennisreimann
+
+
+### Improvements
+
+* Improved Payment Requests List View (#3872 #5065) @TChukwuleta
+* Improve create first store view (#5008 #5181) @dennisreimann
+* Invoice lists: Show icons for payment methods (#5084 #5137) @dennisreimann
+* Apps: Add direct file upload in item editor (#5086 #5140) @dennisreimann
+* Add OpenSats supporters logo (#5202) @Kukks @Pavlenex
+* Add recommended rate providers for UGX and RSD (#5166) @Kukks
+
+## 1.10.3
+
+### New Features
+
+* Pull Payment: Support LNURL Withdraw with SATS denomination (#5041) @dennnisreimann
+
+### Bug fixes
+
+* Crowdfund: Fix JS errors in empty state (#5121) @dennisreimann
+* The current preimage of a invoice's lightning payment method should be available via API (#5111) @NicolasDorier
+* Dashboard: Limit "Top Items" to five (#5110) @dennisreimann
+* ToolTip causes glitching when scrolling down on mobile (#4956) @dennisreimann
+* LN payments failed to be detected on litd (#5104) @NicolasDorier
+* Fix for LNDHub via LNbits integration (#5083 #4482) @dennisreimann
+* Applying a discount in PoS with cart wasn't working (#5079) @NicolasDorier
+* Refund: Fix overpaid option (#5076 #5066) @dennisreimann
+* Do not crash when an invoice have an amount that is too big (#5070) @NicolasDorier
+* NFC: Do not start scanning if unsupported (#5067) @dennisreimann
+* Fix: Incorrect rounding in the receipt of PoS invoice (#5071 #5072) @NicolasDorier
+* Crowdfund: Fix null pointer exception for topup type (missing price) (#5068) @dennisreimann
+* Greenfield: Default currency missing from stores API (#5126) @dennisreimann
+
+### Improvements
+
+* Load wallet transaction list asynchronously to avoid timeout on large wallets (#5100 #4987) @NicolasDorier
+* Receipt improvements (#5077) @dennisreimann
+* Dashboard: Make invoice badges consistent with those on invoices list (#5108 #4969) @dennisreimann
+* Make file management UI more useful (#5081) @Kukks
+* After changing PoS items values, the JSON template should be indented @NicolasDorier
+* Add extension point to template editor (#5080) @Kukks
+* Querying a lightning address no longer generates an invoice each time (#5117) @NicolasDorier
+
+## 1.10.2
+
+### Bug fixes
+
+* Fix: Stale data when fetching invoice after webhook (#5049) @Kukks
+* Fix: Crash on migation of old instances (#5051) @NicolasDorier
+* Fix: Hide sensitive info feature not working with custom theme (#5044) @dennisreimann
+* Fix: Pay button not rendering on the invoice page (#5043) @dennisreimann
+* Doc update: Remove id from create webhook endpoint; fix consistency. (#5045) @ndeet
+
 ## 1.10.1
 
 ### Bug fixes
@@ -53,9 +151,9 @@ This data, generally used for debugging integrations, will be regularly purged. 
 * Crowdfund: Fix redirect URL fallback (#4943) @dennisreimann
 * Greenfield: Apply store default payment method on invoice creation (#4947) @dennisreimann
 * POS: Fix Firefox issues (#4950) @r0ckstardev
-* Fix viewing arrays in the invoice details when set in metadata (#4954) @Kukks 
+* Fix viewing arrays in the invoice details when set in metadata (#4954) @Kukks
 * Do not crash checkout when attempting LNURL checkout through non-secure page (#4964) @Kukks
-* NFC: Handle HTTP-related exceptions (#4965) @dennisreimann 
+* NFC: Handle HTTP-related exceptions (#4965) @dennisreimann
 
 ### Improvements
 

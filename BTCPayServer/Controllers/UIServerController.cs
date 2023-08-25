@@ -29,6 +29,7 @@ using BTCPayServer.Storage.Services;
 using BTCPayServer.Storage.Services.Providers;
 using BTCPayServer.Validation;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -664,6 +665,8 @@ namespace BTCPayServer.Controllers
 
         [Route("lnd-config/{configKey}/lnd.config")]
         [AllowAnonymous]
+        [EnableCors(CorsPolicies.All)]
+        [IgnoreAntiforgeryToken]
         public IActionResult GetLNDConfig(ulong configKey)
         {
             var conf = _LnConfigProvider.GetConfig(configKey);
@@ -1047,29 +1050,28 @@ namespace BTCPayServer.Controllers
             {
                 if (model.LogoFile.Length > 1_000_000)
                 {
-                    TempData[WellKnownTempData.ErrorMessage] = "The uploaded logo file should be less than 1MB";
+                    ModelState.AddModelError(nameof(model.LogoFile), "The uploaded logo file should be less than 1MB");
                 }
                 else if (!model.LogoFile.ContentType.StartsWith("image/", StringComparison.InvariantCulture))
                 {
-                    TempData[WellKnownTempData.ErrorMessage] = "The uploaded logo file needs to be an image";
+                    ModelState.AddModelError(nameof(model.LogoFile), "The uploaded logo file needs to be an image");
                 }
                 else
                 {
                     var formFile = await model.LogoFile.Bufferize();
                     if (!FileTypeDetector.IsPicture(formFile.Buffer, formFile.FileName))
                     {
-                        TempData[WellKnownTempData.ErrorMessage] = "The uploaded logo file needs to be an image";
+                        ModelState.AddModelError(nameof(model.LogoFile), "The uploaded logo file needs to be an image");
                     }
                     else
                     {
                         model.LogoFile = formFile;
-                        // delete existing image
+                        // delete existing file
                         if (!string.IsNullOrEmpty(settings.LogoFileId))
                         {
                             await _fileService.RemoveFile(settings.LogoFileId, userId);
                         }
-
-                        // add new image
+                        // add new file
                         try
                         {
                             var storedFile = await _fileService.AddFile(model.LogoFile, userId);

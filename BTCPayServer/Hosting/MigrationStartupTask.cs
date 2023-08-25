@@ -341,9 +341,13 @@ namespace BTCPayServer.Hosting
         {
             var items = new List<ViewPointOfSaleViewModel.Item>();
             var stream = new YamlStream();
+            if (string.IsNullOrEmpty(yaml))
+                return items.ToArray();
+            
             stream.Load(new StringReader(yaml));
 
-            var root = stream.Documents.First().RootNode as YamlMappingNode;
+            if(stream.Documents.FirstOrDefault()?.RootNode is not YamlMappingNode root)
+                return items.ToArray();
             foreach (var posItem in root.Children)
             {
                 var trimmedKey = ((YamlScalarNode)posItem.Key).Value?.Trim();
@@ -640,8 +644,6 @@ WHERE cte.""Id""=p.""Id""
             await using var ctx = _DBContextFactory.CreateContext();
             foreach (var app in await ctx.Apps.Include(data => data.StoreData).AsQueryable().ToArrayAsync())
             {
-                ViewPointOfSaleViewModel.Item[] items;
-                string newTemplate;
                 switch (app.AppType)
                 {
                     case CrowdfundAppType.AppType:

@@ -39,6 +39,7 @@ using BTCPayServer.Plugins.PayButton;
 using BTCPayServer.Plugins.PointOfSale;
 using BTCPayServer.Plugins.PointOfSale.Controllers;
 using BTCPayServer.Security.Bitpay;
+using BTCPayServer.Security.Greenfield;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Apps;
 using BTCPayServer.Services.Invoices;
@@ -718,7 +719,7 @@ namespace BTCPayServer.Tests
                 btcDerivationScheme.GetDerivation(new KeyPath("0/90")).ScriptPubKey, Money.Coins(1.0m));
             tester.ExplorerNode.Generate(1);
             var transactions = Assert.IsType<ListTransactionsViewModel>(Assert
-                .IsType<ViewResult>(walletController.WalletTransactions(walletId).Result).Model);
+                .IsType<ViewResult>(walletController.WalletTransactions(walletId, loadTransactions: true).Result).Model);
             Assert.Empty(transactions.Transactions);
 
             Assert.IsType<RedirectToActionResult>(walletController.WalletRescan(walletId, rescan).Result);
@@ -747,7 +748,7 @@ namespace BTCPayServer.Tests
             Assert.NotNull(rescan.TimeOfScan);
             Assert.Equal(1, rescan.LastSuccess.Found);
             transactions = Assert.IsType<ListTransactionsViewModel>(Assert
-                .IsType<ViewResult>(walletController.WalletTransactions(walletId).Result).Model);
+                .IsType<ViewResult>(walletController.WalletTransactions(walletId, loadTransactions: true).Result).Model);
             var tx = Assert.Single(transactions.Transactions);
             Assert.Equal(tx.Id, txId.ToString());
 
@@ -762,7 +763,7 @@ namespace BTCPayServer.Tests
                 await walletController.ModifyTransaction(walletId, tx.Id, addcomment: "hello"));
 
             transactions = Assert.IsType<ListTransactionsViewModel>(Assert
-                .IsType<ViewResult>(walletController.WalletTransactions(walletId).Result).Model);
+                .IsType<ViewResult>(walletController.WalletTransactions(walletId, loadTransactions: true).Result).Model);
             tx = Assert.Single(transactions.Transactions);
 
             Assert.Equal("hello", tx.Comment);
@@ -774,7 +775,7 @@ namespace BTCPayServer.Tests
                 await walletController.ModifyTransaction(walletId, tx.Id, removelabel: "test2"));
 
             transactions = Assert.IsType<ListTransactionsViewModel>(Assert
-                .IsType<ViewResult>(walletController.WalletTransactions(walletId).Result).Model);
+                .IsType<ViewResult>(walletController.WalletTransactions(walletId, loadTransactions: true).Result).Model);
             tx = Assert.Single(transactions.Transactions);
 
             Assert.Equal("hello", tx.Comment);
@@ -1760,7 +1761,7 @@ namespace BTCPayServer.Tests
                 var parsedJson = await GetExport(user);
                 Assert.Equal(3, parsedJson.Length);
 
-                var invoiceDueAfterFirstPayment = (3 * networkFee).ToDecimal(MoneyUnit.BTC) * invoice.Rate;
+                var invoiceDueAfterFirstPayment = 3 * networkFee.ToDecimal(MoneyUnit.BTC) * invoice.Rate;
                 var pay1str = parsedJson[0].ToString();
                 Assert.Contains("\"InvoiceItemDesc\": \"Some \\\", description\"", pay1str);
                 Assert.Equal(invoiceDueAfterFirstPayment, GetFieldValue(pay1str, "InvoiceDue"));
@@ -1984,6 +1985,7 @@ namespace BTCPayServer.Tests
             var user = tester.NewAccount();
             user.GrantAccess(true);
             user.RegisterDerivationScheme("BTC");
+            var btcpayClient = await user.CreateClient();
 
             DateTimeOffset expiration = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(21);
 
@@ -2064,6 +2066,20 @@ namespace BTCPayServer.Tests
 
             var zeroInvoicePM = await greenfield.GetInvoicePaymentMethods(user.StoreId, zeroInvoice.Id);
             Assert.Empty(zeroInvoicePM);
+
+            var invoice6 = await btcpayClient.CreateInvoice(user.StoreId,
+                new CreateInvoiceRequest()
+                {
+                    Amount = GreenfieldConstants.MaxAmount,
+                    Currency = "USD"
+                });
+            var repo = tester.PayTester.GetService<InvoiceRepository>();
+            var entity = (await repo.GetInvoice(invoice6.Id));
+            Assert.Equal((decimal)ulong.MaxValue, entity.Price);
+            entity.GetPaymentMethods().First().Calculate();
+            // Shouldn't be possible as we clamp the value, but existing invoice may have that
+            entity.Price = decimal.MaxValue;
+            entity.GetPaymentMethods().First().Calculate();
         }
 
         [Fact(Timeout = LongRunningTestTimeout)]
@@ -2843,7 +2859,7 @@ namespace BTCPayServer.Tests
             using var tester = CreateServerTester();
             await tester.StartAsync();
             var user = tester.NewAccount();
-            user.GrantAccess();
+            await user.GrantAccessAsync();
             var controller = tester.PayTester.GetController<UIServerController>(user.UserId, user.StoreId);
 
             var fileSystemStorageConfiguration = Assert.IsType<FileSystemStorageConfiguration>(Assert
@@ -2857,7 +2873,6 @@ namespace BTCPayServer.Tests
             Assert.Equal(nameof(StorageProvider), shouldBeRedirectingToLocalStorageConfigPage.ActionName);
             Assert.Equal(StorageProvider.FileSystem,
                 shouldBeRedirectingToLocalStorageConfigPage.RouteValues["provider"]);
-
 
             await CanUploadRemoveFiles(controller);
         }
@@ -2890,7 +2905,7 @@ namespace BTCPayServer.Tests
 
             //create a temporary link to file
             var tmpLinkGenerate = Assert.IsType<RedirectToActionResult>(await controller.CreateTemporaryFileUrl(fileId,
-                new UIServerController.CreateTemporaryFileUrlViewModel()
+                new UIServerController.CreateTemporaryFileUrlViewModel
                 {
                     IsDownload = true,
                     TimeAmount = 1,
@@ -2919,6 +2934,125 @@ namespace BTCPayServer.Tests
             viewFilesViewModel =
                 Assert.IsType<ViewFilesViewModel>(Assert.IsType<ViewResult>(await controller.Files(new string[] { fileId })).Model);
             Assert.Null(viewFilesViewModel.DirectUrlByFiles);
+        }
+
+        [Fact]
+        [Trait("Selenium", "Selenium")]
+        public async Task CanCreateReports()
+        {
+            using var tester = CreateServerTester();
+            tester.ActivateLightning();
+            tester.DeleteStore = false;
+            await tester.StartAsync();
+            await tester.EnsureChannelsSetup();
+            var acc = tester.NewAccount();
+            await acc.GrantAccessAsync();
+            await acc.MakeAdmin();
+            acc.RegisterDerivationScheme("BTC", importKeysToNBX: true);
+            acc.RegisterLightningNode("BTC");
+            await acc.ReceiveUTXO(Money.Coins(1.0m));
+
+            var client = await acc.CreateClient();
+            var posController = acc.GetController<UIPointOfSaleController>();
+
+            var app = await client.CreatePointOfSaleApp(acc.StoreId, new CreatePointOfSaleAppRequest()
+            {
+                AppName = "Static",
+                DefaultView =  Client.Models.PosViewType.Static,
+                Template = new PointOfSaleSettings().Template
+            });
+            var resp = await posController.ViewPointOfSale(app.Id, choiceKey: "green-tea");
+            var invoiceId = GetInvoiceId(resp);
+            await acc.PayOnChain(invoiceId);
+
+            app = await client.CreatePointOfSaleApp(acc.StoreId, new CreatePointOfSaleAppRequest()
+            {
+                AppName = "Cart",
+                DefaultView =  Client.Models.PosViewType.Cart,
+                Template = new PointOfSaleSettings().Template
+            });
+            resp = await posController.ViewPointOfSale(app.Id, posData: new JObject()
+            {
+                ["cart"] = new JArray()
+                {
+                    new JObject()
+                    {
+                        ["id"] = "green-tea",
+                        ["count"] = 2
+                    },
+                    new JObject()
+                    {
+                        ["id"] = "black-tea",
+                        ["count"] = 1
+                    },
+                }
+            }.ToString());
+            invoiceId = GetInvoiceId(resp);
+            await acc.PayOnBOLT11(invoiceId);
+
+            resp = await posController.ViewPointOfSale(app.Id, posData: new JObject()
+            {
+                ["cart"] = new JArray()
+                {
+                    new JObject()
+                    {
+                        ["id"] = "green-tea",
+                        ["count"] = 5
+                    }
+                }
+            }.ToString());
+            invoiceId = GetInvoiceId(resp);
+            await acc.PayOnLNUrl(invoiceId);
+
+            await acc.CreateLNAddress();
+            await acc.PayOnLNAddress();
+
+            var report = await GetReport(acc, new() { ViewName = "Payments" });
+            // 1 payment on LN Address
+            // 1 payment on LNURL
+            // 1 payment on BOLT11
+            // 1 payment on chain
+            Assert.Equal(4, report.Data.Count);
+            var lnAddressIndex = report.GetIndex("LightningAddress");
+            var paymentTypeIndex = report.GetIndex("PaymentType");
+            Assert.Contains(report.Data, d => d[lnAddressIndex]?.Value<string>()?.Contains(acc.LNAddress) is true);
+            var paymentTypes = report.Data
+                .GroupBy(d => d[paymentTypeIndex].Value<string>())
+                .ToDictionary(d => d.Key);
+            Assert.Equal(3, paymentTypes["Lightning"].Count());
+            Assert.Single(paymentTypes["On-Chain"]);
+
+            // 2 on-chain transactions: It received from the cashcow, then paid its own invoice
+            report = await GetReport(acc, new() { ViewName = "On-Chain Wallets" });
+            var txIdIndex = report.GetIndex("TransactionId");
+            var balanceIndex = report.GetIndex("BalanceChange");
+            Assert.Equal(2, report.Data.Count);
+            Assert.Equal(64, report.Data[0][txIdIndex].Value<string>().Length);
+            Assert.Contains(report.Data, d => d[balanceIndex].Value<decimal>() == 1.0m);
+
+            // Items sold
+            report = await GetReport(acc, new() { ViewName = "Products sold" });
+            var itemIndex = report.GetIndex("Product");
+            var countIndex = report.GetIndex("Quantity");
+            var itemsCount = report.Data.GroupBy(d => d[itemIndex].Value<string>())
+                .ToDictionary(d => d.Key, r => r.Sum(d => d[countIndex].Value<int>()));
+            Assert.Equal(8, itemsCount["green-tea"]);
+            Assert.Equal(1, itemsCount["black-tea"]);
+        }
+
+        private async Task<StoreReportResponse> GetReport(TestAccount acc, StoreReportRequest req)
+        {
+            var controller = acc.GetController<UIReportsController>();
+            return (await controller.StoreReportsJson(acc.StoreId, req)).AssertType<JsonResult>()
+                .Value
+                .AssertType<StoreReportResponse>();
+        }
+
+        private static string GetInvoiceId(IActionResult resp)
+        {
+            var redirect = resp.AssertType<RedirectToActionResult>();
+            Assert.Equal("Checkout", redirect.ActionName);
+            return (string)redirect.RouteValues["invoiceId"];
         }
     }
 }

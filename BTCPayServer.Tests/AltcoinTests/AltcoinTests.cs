@@ -663,13 +663,13 @@ donation:
                 Assert.Equal(3, vmview.Items.Length);
                 Assert.Equal("good apple", vmview.Items[0].Title);
                 Assert.Equal("orange", vmview.Items[1].Title);
-                Assert.Equal(10.0m, vmview.Items[1].Price.Value);
+                Assert.Equal(10.0m, vmview.Items[1].Price);
                 Assert.Equal("{0} Purchase", vmview.ButtonText);
                 Assert.Equal("Nicolas Sexy Hair", vmview.CustomButtonText);
                 Assert.Equal("Wanna tip?", vmview.CustomTipText);
                 Assert.Equal("15,18,20", string.Join(',', vmview.CustomTipPercentages));
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 0, null, null, null, null, "orange").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 0, choiceKey: "orange").Result);
 
                 //
                 var invoices = await user.BitPay.GetInvoicesAsync();
@@ -678,18 +678,18 @@ donation:
                 Assert.Equal("CAD", orangeInvoice.Currency);
                 Assert.Equal("orange", orangeInvoice.ItemDesc);
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 0, null, null, null, null, "apple").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 0, choiceKey: "apple").Result);
 
-                invoices = user.BitPay.GetInvoices();
+                invoices = await user.BitPay.GetInvoicesAsync();
                 var appleInvoice = invoices.SingleOrDefault(invoice => invoice.ItemCode.Equals("apple"));
                 Assert.NotNull(appleInvoice);
                 Assert.Equal("good apple", appleInvoice.ItemDesc);
 
                 // testing custom amount
                 var action = Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 6.6m, null, null, null, null, "donation").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 6.6m, choiceKey: "donation").Result);
                 Assert.Equal(nameof(UIInvoiceController.Checkout), action.ActionName);
-                invoices = user.BitPay.GetInvoices();
+                invoices = await user.BitPay.GetInvoicesAsync();
                 var donationInvoice = invoices.Single(i => i.Price == 6.6m);
                 Assert.NotNull(donationInvoice);
                 Assert.Equal("CAD", donationInvoice.Currency);
@@ -760,20 +760,20 @@ noninventoryitem:
                 await tester.WaitForEvent<AppInventoryUpdaterHostedService.UpdateAppInventory>(() =>
                 {
                     Assert.IsType<RedirectToActionResult>(publicApps
-                        .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "inventoryitem").Result);
+                        .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "inventoryitem").Result);
                     return Task.CompletedTask;
                 });
 
                 //we already bought all available stock so this should fail
                 await Task.Delay(100);
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "inventoryitem").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "inventoryitem").Result);
 
                 //inventoryitem has unlimited items available
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "noninventoryitem").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "noninventoryitem").Result);
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "noninventoryitem").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "noninventoryitem").Result);
 
                 //verify invoices where created
                 invoices = user.BitPay.GetInvoices();
@@ -809,9 +809,9 @@ normal:
                 vmpos.Template = AppService.SerializeTemplate(MigrationStartupTask.ParsePOSYML(vmpos.Template));
                 Assert.IsType<RedirectToActionResult>(pos.UpdatePointOfSale(app.Id, vmpos).Result);
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "btconly").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "btconly").Result);
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, null, null, null, null, "normal").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Cart, 1, choiceKey: "normal").Result);
                 invoices = user.BitPay.GetInvoices();
                 var normalInvoice = invoices.Single(invoice => invoice.ItemCode == "normal");
                 var btcOnlyInvoice = invoices.Single(invoice => invoice.ItemCode == "btconly");
@@ -865,7 +865,7 @@ g:
                 Assert.Contains(items, item => item.Id == "g" && item.PriceType == ViewPointOfSaleViewModel.ItemPriceType.Topup);
                 
                 Assert.IsType<RedirectToActionResult>(publicApps
-                    .ViewPointOfSale(app.Id, PosViewType.Static, null, null, null, null, null, "g").Result);
+                    .ViewPointOfSale(app.Id, PosViewType.Static, choiceKey: "g").Result);
                 invoices = user.BitPay.GetInvoices();
                 var topupInvoice = invoices.Single(invoice => invoice.ItemCode == "g");
                 Assert.Equal(0, topupInvoice.Price);

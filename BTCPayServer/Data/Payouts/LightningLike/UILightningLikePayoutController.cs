@@ -72,7 +72,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
 
             return (await dbContext.Payouts
                     .Include(data => data.PullPaymentData)
-                    .ThenInclude(data => data.StoreData)
+                    .Include(data => data.StoreData)
                     .ThenInclude(data => data.UserStores)
                     .ThenInclude(data => data.StoreRole)
                     .Where(data =>
@@ -82,11 +82,11 @@ namespace BTCPayServer.Data.Payouts.LightningLike
                     .ToListAsync())
                 .Where(payout =>
                 {
-                    if (approvedStores.TryGetValue(payout.PullPaymentData.StoreId, out var value))
+                    if (approvedStores.TryGetValue(payout.StoreDataId, out var value))
                         return value;
-                    value = payout.PullPaymentData.StoreData.UserStores
+                    value = payout.StoreData.UserStores
                         .Any(store => store.ApplicationUserId == userId && store.StoreRole.Permissions.Contains(Policies.CanModifyStoreSettings));
-                    approvedStores.Add(payout.PullPaymentData.StoreId, value);
+                    approvedStores.Add(payout.StoreDataId, value);
                     return value;
                 }).ToList();
         }
@@ -125,7 +125,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
 
             await using var ctx = _applicationDbContextFactory.CreateContext();
 
-            var payouts = (await GetPayouts(ctx, pmi, payoutIds)).GroupBy(data => data.PullPaymentData.StoreId);
+            var payouts = (await GetPayouts(ctx, pmi, payoutIds)).GroupBy(data => data.StoreDataId);
             var results = new List<ResultVM>();
             var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>(pmi.CryptoCode);
 
@@ -134,7 +134,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
             var authorizedForInternalNode = (await _authorizationService.AuthorizeAsync(User, null, new PolicyRequirement(Policies.CanModifyServerSettings))).Succeeded;
             foreach (var payoutDatas in payouts)
             {
-                var store = payoutDatas.First().PullPaymentData.StoreData;
+                var store = payoutDatas.First().StoreData;
 
                 var lightningSupportedPaymentMethod = store.GetSupportedPaymentMethods(_btcPayNetworkProvider)
                     .OfType<LightningSupportedPaymentMethod>()
@@ -264,7 +264,7 @@ namespace BTCPayServer.Data.Payouts.LightningLike
             PaymentMethodId pmi, CancellationToken cancellationToken)
         {
             var boltAmount = bolt11PaymentRequest.MinimumAmount.ToDecimal(LightMoneyUnit.BTC);
-            if (boltAmount != payoutBlob.CryptoAmount)
+            if (boltAmount > payoutBlob.CryptoAmount)
             {
 
                 payoutData.State = PayoutState.Cancelled;
@@ -277,15 +277,26 @@ namespace BTCPayServer.Data.Payouts.LightningLike
                 };
             }
 
+            if (bolt11PaymentRequest.ExpiryDate < DateTimeOffset.Now)
+            {
+                payoutData.State = PayoutState.Cancelled;
+                return new ResultVM
+                {
+                    PayoutId = payoutData.Id,
+                    Result = PayResult.Error,
+                    Message = $"The BOLT11 invoice expiry date ({bolt11PaymentRequest.ExpiryDate}) has expired",
+                    Destination = payoutBlob.Destination
+                };
+            }
+
             var proofBlob = new PayoutLightningBlob() { PaymentHash = bolt11PaymentRequest.PaymentHash.ToString() };
             try
             {
                 var result = await lightningClient.Pay(bolt11PaymentRequest.ToString(),
                     new PayInvoiceParams()
                     {
-                        Amount = bolt11PaymentRequest.MinimumAmount == LightMoney.Zero
-                            ? new LightMoney((decimal)payoutBlob.CryptoAmount, LightMoneyUnit.BTC)
-                            : null
+                        // CLN does not support explicit amount param if it is the same as the invoice amount
+                        Amount = payoutBlob.CryptoAmount == bolt11PaymentRequest.MinimumAmount.ToDecimal(LightMoneyUnit.BTC)? null: new LightMoney((decimal)payoutBlob.CryptoAmount, LightMoneyUnit.BTC)
                     }, cancellationToken);
                 string message = null;
                 if (result.Result == PayResult.Ok)

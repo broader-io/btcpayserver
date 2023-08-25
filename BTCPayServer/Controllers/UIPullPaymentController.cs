@@ -29,6 +29,7 @@ namespace BTCPayServer.Controllers
         private readonly CurrencyNameTable _currencyNameTable;
         private readonly DisplayFormatter _displayFormatter;
         private readonly PullPaymentHostedService _pullPaymentHostedService;
+        private readonly BTCPayNetworkProvider _networkProvider;
         private readonly BTCPayNetworkJsonSerializerSettings _serializerSettings;
         private readonly IEnumerable<IPayoutHandler> _payoutHandlers;
         private readonly StoreRepository _storeRepository;
@@ -37,6 +38,7 @@ namespace BTCPayServer.Controllers
             CurrencyNameTable currencyNameTable,
             DisplayFormatter displayFormatter,
             PullPaymentHostedService pullPaymentHostedService,
+            BTCPayNetworkProvider networkProvider,
             BTCPayNetworkJsonSerializerSettings serializerSettings,
             IEnumerable<IPayoutHandler> payoutHandlers,
             StoreRepository storeRepository)
@@ -48,6 +50,7 @@ namespace BTCPayServer.Controllers
             _serializerSettings = serializerSettings;
             _payoutHandlers = payoutHandlers;
             _storeRepository = storeRepository;
+            _networkProvider = networkProvider;
         }
 
         [AllowAnonymous]
@@ -102,6 +105,13 @@ namespace BTCPayServer.Controllers
                           }).ToList()
             };
             vm.IsPending &= vm.AmountDue > 0.0m;
+            
+            if (_pullPaymentHostedService.SupportsLNURL(blob))
+            {
+                var url = Url.Action("GetLNURLForPullPayment", "UILNURL", new { cryptoCode = _networkProvider.DefaultNetwork.CryptoCode, pullPaymentId = vm.Id }, Request.Scheme, Request.Host.ToString());
+                vm.LnurlEndpoint = url != null ? new Uri(url) : null;
+            }
+            
             return View(nameof(ViewPullPayment), vm);
         }
 
@@ -189,21 +199,15 @@ namespace BTCPayServer.Controllers
                 ModelState.AddModelError(nameof(vm.Destination), destination.error ?? "Invalid destination with selected payment method");
                 return await ViewPullPayment(pullPaymentId);
             }
-
-            if (vm.ClaimedAmount == 0)
+            
+            var amtError = ClaimRequest.IsPayoutAmountOk(destination.destination, vm.ClaimedAmount == 0? null: vm.ClaimedAmount, paymentMethodId.CryptoCode, ppBlob.Currency);
+            if (amtError.error is not null)
             {
-                ModelState.AddModelError(nameof(vm.ClaimedAmount), "Amount is required");
+                ModelState.AddModelError(nameof(vm.ClaimedAmount), amtError.error );
             }
-            else
+            else if (amtError.amount is not null)
             {
-                var amount = ppBlob.Currency == "SATS" ? new Money(vm.ClaimedAmount, MoneyUnit.Satoshi).ToUnit(MoneyUnit.BTC) : vm.ClaimedAmount;
-                if (destination.destination.Amount != null && amount != destination.destination.Amount)
-                {
-                    var implied = _displayFormatter.Currency(destination.destination.Amount.Value, paymentMethodId.CryptoCode, DisplayFormatter.CurrencyFormat.Symbol);
-                    var provided = _displayFormatter.Currency(vm.ClaimedAmount, ppBlob.Currency, DisplayFormatter.CurrencyFormat.Symbol);
-                    ModelState.AddModelError(nameof(vm.ClaimedAmount),
-                        $"Amount implied in destination ({implied}) does not match the payout amount provided ({provided}).");
-                }
+                vm.ClaimedAmount = amtError.amount.Value;
             }
 
             if (!ModelState.IsValid)
