@@ -73,6 +73,11 @@ namespace BTCPayServer.Plugins.BSC.Payments
         {
             return Address;
         }
+
+        public string GetPaymentProof()
+        {
+            throw new System.NotImplementedException();
+        }
     }
 }
 #endif

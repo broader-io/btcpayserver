@@ -12,6 +12,7 @@ using BTCPayServer.Payments;
 using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Plugins.BSC.Services;
 using BTCPayServer.Services.Invoices;
+using NBitcoin;
 using Nethereum.Web3;
 
 namespace BTCPayServer.Plugins.BSC.Payments
@@ -83,6 +84,11 @@ namespace BTCPayServer.Plugins.BSC.Payments
         public override void PreparePaymentModel(PaymentModel model, InvoiceResponse invoiceResponse,
             StoreBlob storeBlob, IPaymentMethod paymentMethod)
         {
+            var satoshiCulture = new CultureInfo(CultureInfo.InvariantCulture.Name)
+            {
+                NumberFormat = { NumberGroupSeparator = " " }
+            };
+            
             var divisbility = ((PaymentMethod)paymentMethod).Network.Divisibility;
             var paymentMethodId = paymentMethod.GetId();
             var cryptoInfo = invoiceResponse.CryptoInfo.First(o => o.GetpaymentMethodId() == paymentMethodId);
@@ -94,7 +100,8 @@ namespace BTCPayServer.Plugins.BSC.Payments
             model.CryptoImage = GetCryptoImage(network);
             model.InvoiceBitcoinUrl = "";
             model.InvoiceBitcoinUrlQR = url ?? "";
-            model.BtcDue = amountWei.ToString(new CultureInfo("en-US"));
+            //model.BtcDue = amountWei.ToString(new CultureInfo("en-US"));
+            model.BtcDue = Money.Parse(model.BtcDue).ToUnit(MoneyUnit.Satoshi).ToString(satoshiCulture);
         }
 
         public override string GetCryptoImage(PaymentMethodId paymentMethodId)

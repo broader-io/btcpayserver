@@ -4,6 +4,7 @@ using BTCPayServer.Payments;
 using BTCPayServer.Plugins.BSC.Payments;
 using NBitcoin;
 using Nethereum.HdWallet;
+using Newtonsoft.Json;
 
 namespace BTCPayServer.Plugins.BSC.Payments
 {
@@ -13,6 +14,7 @@ namespace BTCPayServer.Plugins.BSC.Payments
         public string Seed { get; set; }
         public string Password { get; set; }
         public string XPub { get; set; }
+        [JsonIgnore]
         public PaymentMethodId PaymentId => new PaymentMethodId(CryptoCode, BSCPaymentType.Instance);
         public long CurrentIndex { get; set; }
         public string KeyPath { get; set; }

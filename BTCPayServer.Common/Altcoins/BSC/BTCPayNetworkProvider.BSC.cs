@@ -14,14 +14,14 @@ namespace BTCPayServer
                 DisplayName = "BNB",
                 DefaultRateRules = new[]
                 {
-                    "bPROSUS_X = bPROSUS_BTC * BTC_X",
-                    "BPROSUS_BTC = bprosus(BPROSUS_BTC)",
+                    "wPROSUS_X = wPROSUS_BTC * BTC_X",
+                    "wPROSUS_BTC = wPROSUS(wPROSUS_BTC)",
                 },
                 BlockExplorerLink =
                     NetworkType == ChainName.Mainnet
                         ? "https://bscscan.com/{0}"
                         : "https://testnet.bscscan.com/{0}",
-                CryptoImagePath = "/imlegacy/bprosus.png",
+                CryptoImagePath = "/imlegacy/wPROSUS.png",
                 ShowSyncSummary = true,
                 CoinType = NetworkType == ChainName.Mainnet? 714 : 1,
                 ChainId = NetworkType == ChainName.Mainnet ? 56 : 97,
@@ -29,22 +29,22 @@ namespace BTCPayServer
             });
         }
         
-        public void InitBPROSUS()
+        public void InitwPROSUS()
         {
             if (NetworkType != ChainName.Mainnet)
             {
-                // This is to run BPROSUS in mainnet even though BTCPayserver is not in mainnet
+                // This is to run wPROSUS in mainnet even though BTCPayserver is not in mainnet
                 // Add(new BEP20BTCPayNetwork()
                 // {
-                //     CryptoCode = "bPROSUS",
+                //     CryptoCode = "wPROSUS",
                 //     DisplayName = "PROSUS-BSC",
                 //     DefaultRateRules = new[]
                 //     {
-                //         "bPROSUS_X = bPROSUS_BTC * BTC_X",
-                //         "BPROSUS_BTC = bprosus(BPROSUS_BTC)",
+                //         "wPROSUS_X = wPROSUS_BTC * BTC_X",
+                //         "wPROSUS_BTC = wPROSUS(wPROSUS_BTC)",
                 //     },
                 //     BlockExplorerLink = "https://bscscan.com/token/0xCDfd3D7817F9402e58a428CF304Cb7493e98336D/?a={0}",
-                //     CryptoImagePath = "/imlegacy/bprosus.png",
+                //     CryptoImagePath = "/imlegacy/wPROSUS.png",
                 //     ShowSyncSummary = false,
                 //     CoinType = 714,
                 //     ChainId = 56,
@@ -53,12 +53,12 @@ namespace BTCPayServer
                 // });
                 Add(new BEP20BTCPayNetwork()
                 {
-                    CryptoCode = "bPROSUS",
+                    CryptoCode = "wPROSUS",
                     DisplayName = "PROSUS-BSC",
                     DefaultRateRules = new[]
                     {
-                        "bPROSUS_X = bPROSUS_BTC * BTC_X",
-                        "BPROSUS_BTC = bprosus(BPROSUS_BTC)",
+                        "wPROSUS_X = wPROSUS_BTC * BTC_X",
+                        "wPROSUS_BTC = wPROSUS(wPROSUS_BTC)",
                     },
                     BlockExplorerLink = "https://testnet.bscscan.com/token/0xb0D86E2C31b153FfF675c449226777Cc4ddcd177/?a={0}",
                     ShowSyncSummary = false,
@@ -67,25 +67,25 @@ namespace BTCPayServer
                     //use https://erc20faucet.com for testnet
                     SmartContractAddress = "0xb0D86E2C31b153FfF675c449226777Cc4ddcd177",
                     Divisibility = 12,
-                    CryptoImagePath = "/imlegacy/bprosus.png",
+                    CryptoImagePath = "/imlegacy/wPROSUS.png",
                 });
             }
             else
             {
                 Add(new BEP20BTCPayNetwork()
                 {
-                    CryptoCode = "bPROSUS",
+                    CryptoCode = "wPROSUS",
                     DisplayName = "PROSUS-BSC",
                     DefaultRateRules = new[]
                     {
-                        "bPROSUS_X = bPROSUS_BTC * BTC_X",
-                        "BPROSUS_BTC = bprosus(BPROSUS_BTC)",
+                        "wPROSUS_X = wPROSUS_BTC * BTC_X",
+                        "wPROSUS_BTC = wPROSUS(wPROSUS_BTC)",
                     },
                     BlockExplorerLink =
                         NetworkType == ChainName.Mainnet
                             ? "https://bscscan.com/token/0xCDfd3D7817F9402e58a428CF304Cb7493e98336D/?a={0}"
                             : "https://testnet.bscscan.com/token/0xCDfd3D7817F9402e58a428CF304Cb7493e98336D/?a={0}",
-                    CryptoImagePath = "/imlegacy/bprosus.png",
+                    CryptoImagePath = "/imlegacy/wPROSUS.png",
                     ShowSyncSummary = false,
                     CoinType = NetworkType == ChainName.Mainnet? 714 : 1,
                     ChainId = NetworkType == ChainName.Mainnet ? 56 : 97,

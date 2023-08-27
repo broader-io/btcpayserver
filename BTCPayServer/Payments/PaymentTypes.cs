@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using BTCPayServer.Plugins.BSC.Payments;
 #if ALTCOINS
 using BTCPayServer.Services.Altcoins.Monero.Payments;
 using BTCPayServer.Services.Altcoins.Zcash.Payments;
@@ -19,7 +20,7 @@ namespace BTCPayServer.Payments
         {
             BTCLike, LightningLike, LNURLPay,
 #if ALTCOINS
-            MoneroLike, ZcashLike,
+            MoneroLike, ZcashLike, BSCPaymentType.Instance
 #endif
         };
         /// <summary>

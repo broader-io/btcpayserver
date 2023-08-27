@@ -29,6 +29,9 @@ namespace BTCPayServer.Services.Rates
             Client.BaseAddress = new Uri("https://api.coingecko.com/api/v3/simple/");
             Client.DefaultRequestHeaders.Add("Accept", "application/json");
         }
+        
+        public RateSourceInfo RateSourceInfo => new("wprosus", "wProsus", "https://rates.prosuspay.com/rates");
+
 
         public async Task<PairRate[]> GetRatesAsync(CancellationToken cancellationToken)
         {
@@ -52,7 +55,7 @@ namespace BTCPayServer.Services.Rates
             return new List<PairRate>
             {
                 //new PairRate(new CurrencyPair("BPROSUS", "BTC"), new BidAsk(value * usd.btc))
-                new PairRate(new CurrencyPair("bPROSUS", "BTC"), new BidAsk(new Decimal(0.0000004084868210771281)))
+                new PairRate(new CurrencyPair("wPROSUS", "BTC"), new BidAsk(new Decimal(0.0000004084868210771281)))
             }.ToArray();
 
             TimeSpan diff = start - DateTimeOffset.Now;

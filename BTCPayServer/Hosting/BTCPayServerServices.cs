@@ -529,6 +529,7 @@ namespace BTCPayServer.Hosting
             services.AddRateProvider<BtcTurkRateProvider>();
             services.AddRateProvider<FreeCurrencyRatesRateProvider>();
             services.AddRateProvider<ExchangeRateHostRateProvider>();
+            services.AddRateProvider<BPROSUSRateProvider>();
 
             // Broken
             // Providers.Add("argoneum", new ArgoneumRateProvider(_httpClientFactory?.CreateClient("EXCHANGE_ARGONEUM")));

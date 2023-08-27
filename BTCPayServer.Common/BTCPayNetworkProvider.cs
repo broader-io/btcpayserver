@@ -78,6 +78,8 @@ namespace BTCPayServer
             // Disabled because of https://twitter.com/Cryptopia_NZ/status/1085084168852291586
             //InitBPlus();
             //InitUfo();
+            
+            InitwPROSUS();
 #endif
         }
 

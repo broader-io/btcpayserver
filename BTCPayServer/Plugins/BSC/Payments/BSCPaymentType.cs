@@ -46,10 +46,10 @@ namespace BTCPayServer.Plugins.BSC.Payments
             return string.Format(CultureInfo.InvariantCulture, network.BlockExplorerLink, txId);
         }
 
-        public override string GetPaymentLink(BTCPayNetworkBase network, IPaymentMethodDetails paymentMethodDetails, Money cryptoInfoDue,
-            string serverUri)
+        public override string GetPaymentLink(BTCPayNetworkBase network, InvoiceEntity invoice, IPaymentMethodDetails paymentMethodDetails,
+            decimal cryptoInfoDue, string serverUri)
         {
-            return "";
+            throw new System.NotImplementedException();
         }
 
         public override string InvoiceViewPaymentPartialName { get; }= "Plugins/BSC/Views/Shared/ViewBSCPaymentData";
@@ -67,8 +67,10 @@ namespace BTCPayServer.Plugins.BSC.Payments
             return null;
         }
 
-        public override void PopulateCryptoInfo(PaymentMethod details, InvoiceCryptoInfo invoiceCryptoInfo, string serverUrl)
+        public override void PopulateCryptoInfo(InvoiceEntity invoice, PaymentMethod details, InvoiceCryptoInfo invoiceCryptoInfo,
+            string serverUrl)
         {
+            
         }
     }
 }
