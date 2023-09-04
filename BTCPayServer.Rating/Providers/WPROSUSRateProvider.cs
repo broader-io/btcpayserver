@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Numerics;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,22 +8,9 @@ using BTCPayServer.Rating;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 
-// using Nethereum.ABI.FunctionEncoding.Attributes;
-using Nethereum.Web3;
-using Nethereum.Web3.Accounts;
-
 namespace BTCPayServer.Services.Rates
 {
-    // [Function("buyPrice", "uint256")]
-    // public class BuyPrice : FunctionMessage
-    // {
-    // }
 
-    public class BNBUSDResult
-    {
-        public decimal btc { get; set; }
-    }
-    
     [Function("balanceOf", "uint256")]
     public class BalanceOf : FunctionMessage
     {
@@ -36,8 +21,6 @@ namespace BTCPayServer.Services.Rates
     public class WPROSUSRateProvider : IRateProvider
     {
         private readonly HttpClient Client;
-
-        private Dictionary<String, String> ABIs;
 
         public WPROSUSRateProvider(IHttpClientFactory httpClientFactory)
         {
