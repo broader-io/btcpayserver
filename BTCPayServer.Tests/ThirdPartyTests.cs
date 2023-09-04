@@ -146,12 +146,19 @@ namespace BTCPayServer.Tests
                         e => e.CurrencyPair == new CurrencyPair("BTC", "LBP") &&
                              e.BidAsk.Bid > 1.0m); // 1 BTC will always be more than 1 LBP (I hope)
                 }
+                else if (name == "wprosus")
+                {
+                    Assert.Contains(exchangeRates.ByExchange[name],
+                        e => e.CurrencyPair == new CurrencyPair("WPROSUS", "USDT") &&
+                             e.BidAsk.Bid > 1.0m);
+                }
                 else
                 {
                     if (name == "kraken")
                     {
                         Assert.Contains(exchangeRates.ByExchange[name], e => e.CurrencyPair == new CurrencyPair("XMR", "BTC") && e.BidAsk.Bid < 1.0m);
                     }
+
                     // This check if the currency pair is using right currency pair
                     Assert.Contains(exchangeRates.ByExchange[name],
                         e => (e.CurrencyPair == new CurrencyPair("BTC", "USD") ||

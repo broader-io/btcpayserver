@@ -71,8 +71,8 @@ namespace BTCPayServer
                     DefaultRateRules =
                         new[]
                         {
-                            "wPROSUS_X = wPROSUS_USD", 
-                            "wPROSUS_USD = wPROSUS(wPROSUS_USD)",
+                            "wPROSUS_X = wPROSUS_USDT", 
+                            "wPROSUS_USDT = wPROSUS(wPROSUS_USDT)",
                         },
                     BlockExplorerLink =
                         "https://bscscan.com/token/0x56f86cfa34cf4004736554c2784d59e477589c8c/?a={0}",
