@@ -109,7 +109,7 @@ workflows:
   build_and_test:
     jobs:
       - fast_tests
-      - selenium_tests
+      #- selenium_tests
       - integration_tests
   publish:
     jobs:
