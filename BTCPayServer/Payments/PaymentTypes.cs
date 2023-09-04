@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using BTCPayServer.Plugins.BSC.Payments;
+using BTCPayServer.Plugins;
 #if ALTCOINS
 using BTCPayServer.Services.Altcoins.Monero.Payments;
 using BTCPayServer.Services.Altcoins.Zcash.Payments;

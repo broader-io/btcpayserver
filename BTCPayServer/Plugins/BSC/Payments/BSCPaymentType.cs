@@ -1,12 +1,12 @@
 #if ALTCOINS
 using System.Globalization;
-using NBitcoin;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using BTCPayServer.Payments;
+using BTCPayServer.Plugins.BSC;
 using BTCPayServer.Services.Invoices;
 
-namespace BTCPayServer.Plugins.BSC.Payments
+namespace BTCPayServer
 {
     public class BSCPaymentType: PaymentType
     {

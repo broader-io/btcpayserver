@@ -10,7 +10,6 @@ using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.BSC.Configuration;
-using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Services.Invoices;
 using Microsoft.Extensions.Logging;
 using Nethereum.RPC.Eth.DTOs;

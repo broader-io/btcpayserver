@@ -43,6 +43,10 @@
     <Content Remove="Views\Shared\Monero\**\*" />
     <Content Remove="Views\Shared\Zcash\**\*" />
   </ItemGroup>
+   
+   <ItemGroup>
+     <Folder Include="Plugins\BSC\**\*" />
+   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Nethereum.HdWallet" Version="4.16.0" />
@@ -120,7 +124,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Plugins\ProsusPay\Payments" />
 	  <Folder Include="wwwroot\vendor\bootstrap" />
 	  <Folder Include="wwwroot\vendor\clipboard.js\" />
 	  <Folder Include="wwwroot\vendor\highlightjs\" />

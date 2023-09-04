@@ -1,8 +1,7 @@
 #if ALTCOINS
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Payments;
 
-namespace BTCPayServer.Plugins.BSC.Payments
+namespace BTCPayServer.Plugins.BSC
 {
     public class BSCOnChainPaymentMethodDetails : IPaymentMethodDetails
     {

@@ -504,7 +504,7 @@ namespace BTCPayServer.Hosting
         internal static void RegisterRateSources(IServiceCollection services)
         {
             // We need to be careful to only add exchanges which OnGetTickers implementation make only 1 request
-            services.AddRateProviderExchangeSharp<ExchangeBinanceAPI>(new("binance", "Binance", "https://api.binance.com/api/v1/ticker/24hr"));
+            //services.AddRateProviderExchangeSharp<ExchangeBinanceAPI>(new("binance", "Binance", "https://api.binance.com/api/v1/ticker/24hr"));
             services.AddRateProviderExchangeSharp<ExchangeBittrexAPI>(new("bittrex", "Bittrex", "https://bittrex.com/api/v1.1/public/getmarketsummaries"));
             services.AddRateProviderExchangeSharp<ExchangePoloniexAPI>(new("poloniex", "Poloniex", "https://poloniex.com/public?command=returnTicker"));
             services.AddRateProviderExchangeSharp<ExchangeNDAXAPI>(new("ndax", "NDAX", "https://ndax.io/api/returnTicker"));

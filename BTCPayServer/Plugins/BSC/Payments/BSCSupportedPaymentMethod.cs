@@ -1,12 +1,11 @@
 #if ALTCOINS
 using System;
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Payments;
 using NBitcoin;
 using Nethereum.HdWallet;
 using Newtonsoft.Json;
 
-namespace BTCPayServer.Plugins.BSC.Payments
+namespace BTCPayServer.Plugins.BSC
 {
     public class BSCSupportedPaymentMethod : ISupportedPaymentMethod
     {

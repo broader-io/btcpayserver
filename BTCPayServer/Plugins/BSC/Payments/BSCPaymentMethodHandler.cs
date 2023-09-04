@@ -9,13 +9,11 @@ using BTCPayServer.Logging;
 using BTCPayServer.Models;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Plugins.BSC.Services;
 using BTCPayServer.Services.Invoices;
-using NBitcoin;
 using Nethereum.Web3;
 
-namespace BTCPayServer.Plugins.BSC.Payments
+namespace BTCPayServer.Plugins.BSC
 {
     public class
         BSCPaymentMethodHandler : PaymentMethodHandlerBase<BSCSupportedPaymentMethod,

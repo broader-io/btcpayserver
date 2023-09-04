@@ -1,14 +1,11 @@
 #if ALTCOINS
 using System.Globalization;
-using System.Numerics;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Services.Invoices;
-using Nethereum.Hex.HexTypes;
 using Nethereum.Web3;
 
-namespace BTCPayServer.Plugins.BSC.Payments
+namespace BTCPayServer.Plugins.BSC
 {
     public class BSCPaymentData : CryptoPaymentData
     {

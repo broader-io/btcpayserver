@@ -10,8 +10,6 @@ using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Filters;
-using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Services.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +19,6 @@ using Nethereum.HdWallet;
 namespace BTCPayServer.Plugins.BSC.Controllers
 {
     [Route("stores/{storeId}/bsc")]
-    [OnlyIfSupportBSC]
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     [Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public class BSCStoreController : Controller

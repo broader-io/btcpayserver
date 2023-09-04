@@ -1,4 +1,4 @@
-#if ALTCOINS
+
 namespace BTCPayServer
 {
     public class BSCBTCPayNetwork : BTCPayNetworkBase
@@ -18,4 +18,4 @@ namespace BTCPayServer
     }
 
 }
-#endif
+

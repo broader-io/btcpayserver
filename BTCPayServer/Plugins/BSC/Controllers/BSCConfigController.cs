@@ -9,24 +9,16 @@ using BTCPayServer.Abstractions.Extensions;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
-using BTCPayServer.Models;
 using BTCPayServer.Plugins.BSC.Configuration;
-using BTCPayServer.Plugins.BSC.Filters;
 using BTCPayServer.Plugins.BSC.Services;
-using BTCPayServer.Security;
 using BTCPayServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using NBitcoin;
-using Nethereum.Hex.HexConvertors.Extensions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace BTCPayServer.Plugins.BSC.Controllers
 {
     [Route("bscconfig")]
-    [OnlyIfSupportBSC]
     [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     [Authorize(Policy = Policies.CanModifyServerSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
     public class BSCConfigController : Controller

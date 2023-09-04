@@ -10,7 +10,6 @@ using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.BSC.Configuration;
-using BTCPayServer.Plugins.BSC.Payments;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Invoices;
