@@ -20,7 +20,7 @@ namespace BTCPayServer
                 ShowSyncSummary = true,
                 CoinType = NetworkType == ChainName.Mainnet ? 714 : 1,
                 ChainId = NetworkType == ChainName.Mainnet ? 56 : 97,
-                Divisibility = 18,
+                Divisibility = 8,
             });
         }
 

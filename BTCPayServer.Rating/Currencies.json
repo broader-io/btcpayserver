@@ -1309,13 +1309,6 @@
       "crypto":true
    },
    {
-       "name": "Ethereum",
-       "code": "ETH",
-       "divisibility": 18,
-       "symbol": null,
-       "crypto": true
-   },
-   {
        "name":"USDt",
        "code":"USDT20",
        "divisibility":6,
@@ -1328,5 +1321,19 @@
        "divisibility":18,
        "symbol":null,
        "crypto":true
-   }
-]
+   },   
+   {
+       "name": "WPROSUS",
+       "code": "WPROSUS",
+       "divisibility": 12,
+       "symbol": null,
+       "crypto": true
+   },
+    {
+       "name": "BNB",
+       "code": "BNB",
+       "divisibility": 8,
+       "symbol": null,
+       "crypto": true
+    }
+] 
