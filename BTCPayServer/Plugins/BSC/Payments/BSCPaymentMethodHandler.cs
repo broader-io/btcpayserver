@@ -101,7 +101,7 @@ namespace BTCPayServer.Plugins.BSC.Payments
             model.InvoiceBitcoinUrl = "";
             model.InvoiceBitcoinUrlQR = url ?? "";
             //model.BtcDue = amountWei.ToString(new CultureInfo("en-US"));
-            model.BtcDue = Money.Parse(model.BtcDue).ToUnit(MoneyUnit.Satoshi).ToString(satoshiCulture);
+            //model.BtcDue = Money.Parse(model.BtcDue).ToUnit(MoneyUnit.Satoshi).ToString(satoshiCulture);
         }
 
         public override string GetCryptoImage(PaymentMethodId paymentMethodId)

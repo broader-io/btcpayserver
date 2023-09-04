@@ -73,22 +73,22 @@ namespace BTCPayServer.Services.Rates
                 AvailableRateProviders.Add(new(rsi.Id, rsi.DisplayName, rsi.Url));
             }
 
-            foreach (var supportedExchange in CoinGeckoRateProvider.SupportedExchanges.Values)
-            {
-                if (!Providers.ContainsKey(supportedExchange.Id) && supportedExchange.Id != CoinGeckoRateProvider.CoinGeckoName)
-                {
-                    var coingecko = new CoinGeckoRateProvider(_httpClientFactory)
-                    {
-                        UnderlyingExchange = supportedExchange.Id
-                    };
-                    var bgFetcher = new BackgroundFetcherRateProvider(coingecko);
-                    bgFetcher.RefreshRate = TimeSpan.FromMinutes(1.0);
-                    bgFetcher.ValidatyTime = TimeSpan.FromMinutes(5.0);
-                    Providers.Add(supportedExchange.Id, bgFetcher);
-                    var rsi = coingecko.RateSourceInfo;
-                    AvailableRateProviders.Add(new(rsi.Id, rsi.DisplayName, rsi.Url, RateSource.Coingecko));
-                }
-            }
+            // foreach (var supportedExchange in CoinGeckoRateProvider.SupportedExchanges.Values)
+            // {
+            //     if (!Providers.ContainsKey(supportedExchange.Id) && supportedExchange.Id != CoinGeckoRateProvider.CoinGeckoName)
+            //     {
+            //         var coingecko = new CoinGeckoRateProvider(_httpClientFactory)
+            //         {
+            //             UnderlyingExchange = supportedExchange.Id
+            //         };
+            //         var bgFetcher = new BackgroundFetcherRateProvider(coingecko);
+            //         bgFetcher.RefreshRate = TimeSpan.FromMinutes(1.0);
+            //         bgFetcher.ValidatyTime = TimeSpan.FromMinutes(5.0);
+            //         Providers.Add(supportedExchange.Id, bgFetcher);
+            //         var rsi = coingecko.RateSourceInfo;
+            //         AvailableRateProviders.Add(new(rsi.Id, rsi.DisplayName, rsi.Url, RateSource.Coingecko));
+            //     }
+            // }
             AvailableRateProviders.Sort((a, b) => StringComparer.Ordinal.Compare(a.DisplayName, b.DisplayName));
         }
 

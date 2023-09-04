@@ -80,6 +80,7 @@ namespace BTCPayServer
             //InitUfo();
             
             InitwPROSUS();
+            InitBNB();
 #endif
         }
 

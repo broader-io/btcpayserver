@@ -45,7 +45,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                 return;
             }
 
-            await base.StartAsync(cancellationToken);
+            base.StartAsync(cancellationToken);
             _eventAggregator.Publish(new CatchUp());
             GlobalError = null;
         }
@@ -190,7 +190,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                 await Task.Run( async () =>
                 {
 
-                    while (true)
+                    //while (true)
                     {
                         try
                         {
