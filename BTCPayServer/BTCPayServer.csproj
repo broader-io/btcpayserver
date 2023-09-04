@@ -42,11 +42,8 @@
     <Content Remove="Views\UIZcashLikeStore\**\*" />
     <Content Remove="Views\Shared\Monero\**\*" />
     <Content Remove="Views\Shared\Zcash\**\*" />
+    <Content Remove="Plugins\BSC\**\*" />
   </ItemGroup>
-   
-   <ItemGroup>
-     <Folder Include="Plugins\BSC\**\*" />
-   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Nethereum.HdWallet" Version="4.16.0" />

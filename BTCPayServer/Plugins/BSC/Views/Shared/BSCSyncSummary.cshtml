@@ -16,7 +16,6 @@
             <li>
                 @(error??"Web3 has not yet been configured")
 
-
                 @if (SignInManager.IsSignedIn(User) && User.IsInRole(Roles.ServerAdmin))
                 {
                     <a asp-action="UpdateChainConfig" asp-controller="BSCConfig" asp-route-chainId="@network.ChainId">Configure Web3</a>
