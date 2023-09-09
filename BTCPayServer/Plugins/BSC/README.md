@@ -19,3 +19,13 @@ https://bscscan.com/token/0x56f86cfa34cf4004736554c2784d59e477589c8c?a=0x46a15b0
 https://bscscan.com/address/0xb048bbc1ee6b733fffcfb9e9cef7375518e25997
 
 # Pool: 0x7d77776ba9ca97004956a0805f206845e772271d
+
+```docker buildx build \
+    --build-arg GIT_COMMIT=24df479a97a136e4533dbe83b6b0b7fd5b5f2da1 \
+    --platform linux/amd64 \
+    --pull \
+    --build-arg CONFIGURATION_NAME=Altcoins-Release \
+    -t 304575033194.dkr.ecr.sa-east-1.amazonaws.com/prod-btcpayserver:latest \
+    -f amd64.Dockerfile .```
+
+`docker push 304575033194.dkr.ecr.sa-east-1.amazonaws.com/prod-btcpayserver:latest`

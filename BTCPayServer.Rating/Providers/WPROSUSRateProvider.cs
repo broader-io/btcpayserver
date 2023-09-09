@@ -47,7 +47,7 @@ namespace BTCPayServer.Services.Rates
             
             return new List<PairRate>
             {
-                new PairRate(new CurrencyPair("WPROSUS", "USDT"), new BidAsk(Decimal.Parse(quote_price_in_usd.GetString())))
+                new PairRate(new CurrencyPair("WPROSUS", "USDT"), new BidAsk(Decimal.Parse(base_price_in_usd.GetString())))
             }.ToArray();
         }
     }

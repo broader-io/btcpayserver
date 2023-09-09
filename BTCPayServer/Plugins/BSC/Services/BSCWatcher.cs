@@ -32,10 +32,12 @@ namespace BTCPayServer.Plugins.BSC.Services
         private readonly Web3 Web3;
         private readonly List<BSCBTCPayNetwork> Networks;
         public string GlobalError { get; private set; } = "The chain watcher is still starting.";
+        
+        private CancellationTokenSource _Cts;
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            Logs.PayServer.LogInformation($"Starting BSCWatcher for chain {ChainId}");
+            Logs.PayServer.LogDebug($"Starting BSCWatcher for chain {ChainId}");
             var result = await Web3.Eth.ChainId.SendRequestAsync();
             if (result.Value != ChainId)
             {
@@ -44,9 +46,21 @@ namespace BTCPayServer.Plugins.BSC.Services
                 return;
             }
 
-            base.StartAsync(cancellationToken);
-            _eventAggregator.Publish(new CatchUp());
+            await base.StartAsync(cancellationToken);
             GlobalError = null;
+
+            _Cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _ = StartLoop(_Cts.Token);
+            //return Task.CompletedTask;
+        }
+
+        private async Task StartLoop(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                _eventAggregator.Publish(new CatchUp());
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            }
         }
 
         protected override void SubscribeToEvents()
@@ -198,7 +212,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                             Thread.Sleep(5000);
                             //_ = await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ContinueWith(task =>
                             //{
-                            Logs.PayServer.LogInformation("Running CatchUp");
+                            Logs.PayServer.LogDebug("Running CatchUp");
                             //_eventAggregator.Publish(new CatchUp());
                             //return Task.CompletedTask;
                             //}, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Current);
@@ -222,7 +236,7 @@ namespace BTCPayServer.Plugins.BSC.Services
 
         // public override Task StopAsync(CancellationToken cancellationToken)
         // {
-        //     Logs.PayServer.LogInformation($"Stopping BSCWatcher for chain {ChainId}");
+        //     Logs.PayServer.LogDebug($"Stopping BSCWatcher for chain {ChainId}");
         //     return null;
         // }
 
@@ -276,7 +290,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                 var tasks = new List<Task>();
                 if (existingPaymentData.Any() && currentBlock.Value != LastBlock)
                 {
-                    Logs.PayServer.LogInformation(
+                    Logs.PayServer.LogDebug(
                         $"Checking {existingPaymentData.Count} existing payments on {expandedInvoices.Count} invoices on {network.CryptoCode}");
                     var blockParameter = new BlockParameter(currentBlock);
 
@@ -302,7 +316,7 @@ namespace BTCPayServer.Plugins.BSC.Services
 
                 if (noAccountedPaymentInvoices.Any())
                 {
-                    Logs.PayServer.LogInformation(
+                    Logs.PayServer.LogDebug(
                         $"Checking {noAccountedPaymentInvoices.Count} addresses for new payments on {network.CryptoCode}");
                     var blockParameter = BlockParameter.CreatePending();
                     tasks.AddRange(noAccountedPaymentInvoices.Select(async tuple =>
