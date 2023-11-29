@@ -21,7 +21,7 @@ https://bscscan.com/address/0xb048bbc1ee6b733fffcfb9e9cef7375518e25997
 # Pool: 0x7d77776ba9ca97004956a0805f206845e772271d
 
 ```docker buildx build \
-    --build-arg GIT_COMMIT=24df479a97a136e4533dbe83b6b0b7fd5b5f2da1 \
+    --build-arg GIT_COMMIT=9f97efa03ee3d5e4bbc4049a3b9e84ce527845e0 \
     --platform linux/amd64 \
     --pull \
     --build-arg CONFIGURATION_NAME=Altcoins-Release \

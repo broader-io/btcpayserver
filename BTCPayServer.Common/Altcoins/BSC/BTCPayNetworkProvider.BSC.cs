@@ -55,7 +55,7 @@ namespace BTCPayServer
                     BlockExplorerLink =
                         "https://testnet.bscscan.com/token/0xe6F47738F66256b8C230f99852CBfAf96d3C02D4/?a={0}",
                     ShowSyncSummary = false,
-                    CoinType = 714,
+                    CoinType = 60,
                     ChainId = 97,
                     SmartContractAddress = "0xe6F47738F66256b8C230f99852CBfAf96d3C02D4",
                     Divisibility = 12,
@@ -78,7 +78,7 @@ namespace BTCPayServer
                         "https://bscscan.com/token/0x56f86cfa34cf4004736554c2784d59e477589c8c/?a={0}",
                     CryptoImagePath = "/imlegacy/wPROSUS.png",
                     ShowSyncSummary = false,
-                    CoinType = 1,
+                    CoinType = 60,
                     ChainId = 56,
                     SmartContractAddress = "0x56f86cfa34cf4004736554c2784d59e477589c8c",
                     Divisibility = 12
