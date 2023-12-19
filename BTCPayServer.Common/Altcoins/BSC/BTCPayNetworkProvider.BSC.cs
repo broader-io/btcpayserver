@@ -1,5 +1,6 @@
 ﻿#if ALTCOINS
 using NBitcoin;
+using NBXplorer;
 
 namespace BTCPayServer
 {
@@ -26,6 +27,7 @@ namespace BTCPayServer
 
         public void InitwPROSUS()
         {
+            var nbxplorerNetwork = NBXplorerNetworkProvider.GetFromCryptoCode("BTC");
             if (NetworkType != ChainName.Mainnet)
             {
                 // Add(new BEP20BTCPayNetwork()
@@ -43,8 +45,12 @@ namespace BTCPayServer
                 //     SmartContractAddress = "0x56f86cfa34cf4004736554c2784d59e477589c8c",
                 //     Divisibility = 12
                 // });
+
+                
+
                 Add(new BEP20BTCPayNetwork()
                 {
+                    NBXplorerNetwork = nbxplorerNetwork,
                     CryptoCode = "WPROSUS",
                     DisplayName = "wPROSUS Testnet",
                     DefaultRateRules = new[]
@@ -66,6 +72,7 @@ namespace BTCPayServer
             {
                 Add(new BEP20BTCPayNetwork()
                 {
+                    NBXplorerNetwork = nbxplorerNetwork,
                     CryptoCode = "WPROSUS",
                     DisplayName = "wPROSUS",
                     DefaultRateRules =

@@ -10,6 +10,7 @@ using BTCPayServer.Models;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.BSC.Services;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using Nethereum.Web3;
 
@@ -21,23 +22,33 @@ namespace BTCPayServer.Plugins.BSC
     {
         private readonly BTCPayNetworkProvider _networkProvider;
         private readonly BSCService _BSCService;
+        private readonly SettingsRepository _settingsRepository;
 
-        public BSCPaymentMethodHandler(BTCPayNetworkProvider networkProvider, BSCService BSCService)
+        public BSCPaymentMethodHandler(
+            BTCPayNetworkProvider networkProvider,
+            BSCService BSCService,
+            SettingsRepository settingsRepository
+        )
         {
             _networkProvider = networkProvider;
             _BSCService = BSCService;
+            _settingsRepository = settingsRepository;
         }
 
         public override PaymentType PaymentType => BSCPaymentType.Instance;
 
-        public override async Task<IPaymentMethodDetails> CreatePaymentMethodDetails(InvoiceLogs logs,
-            BSCSupportedPaymentMethod supportedPaymentMethod, PaymentMethod paymentMethod,
-            StoreData store, BSCBTCPayNetwork network, object preparePaymentObject,
+        public override async Task<IPaymentMethodDetails> CreatePaymentMethodDetails(
+            InvoiceLogs logs,
+            BSCSupportedPaymentMethod supportedSupportedPaymentMethod,
+            PaymentMethod paymentMethod,
+            StoreData store,
+            BSCBTCPayNetwork network,
+            object preparePaymentObject,
             IEnumerable<PaymentMethodId> invoicePaymentMethods)
         {
             if (preparePaymentObject is null)
             {
-                return new BSCOnChainPaymentMethodDetails() {Activated = false};
+                return new BSCPaymentMethodDetails() {Activated = false};
             }
 
             if (!_BSCService.IsAvailable(network.CryptoCode, out var error))
@@ -50,13 +61,25 @@ namespace BTCPayServer.Plugins.BSC
                 throw new PaymentMethodUnavailableException($"could not generate address");
             }
 
-            return new BSCOnChainPaymentMethodDetails()
+            var accountNumber = supportedSupportedPaymentMethod.AccountKeyPath.Split("/")[0];
+
+            var web3 = await Web3Wrapper.GetInstance(network.ChainId, _settingsRepository);
+            var fee = await web3.GetNextFeeRate(network);
+            var keyPath = accountNumber + "/" + address.Index;
+
+            var PaymentMethodDetails = new BSCPaymentMethodDetails()
             {
-                DepositAddress = address.Address, Index = address.Index, XPub = address.XPub, Activated = true
+                Activated = true, _NetworkFeeRate = fee, KeyPath = keyPath, DepositAddress = address.Address
             };
+
+            paymentMethod.DepositAddress = address.Address;
+
+            return PaymentMethodDetails;
         }
 
-        public override object PreparePayment(BSCSupportedPaymentMethod supportedPaymentMethod, StoreData store,
+        public override object PreparePayment(
+            BSCSupportedPaymentMethod supportedPaymentMethod,
+            StoreData store,
             BTCPayNetworkBase network)
         {
             return new Prepare()
@@ -84,9 +107,9 @@ namespace BTCPayServer.Plugins.BSC
         {
             var satoshiCulture = new CultureInfo(CultureInfo.InvariantCulture.Name)
             {
-                NumberFormat = { NumberGroupSeparator = " " }
+                NumberFormat = {NumberGroupSeparator = " "}
             };
-            
+
             var divisbility = ((PaymentMethod)paymentMethod).Network.Divisibility;
             var paymentMethodId = paymentMethod.GetId();
             var cryptoInfo = invoiceResponse.CryptoInfo.First(o => o.GetpaymentMethodId() == paymentMethodId);

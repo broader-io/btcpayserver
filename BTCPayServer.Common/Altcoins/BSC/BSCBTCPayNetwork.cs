@@ -1,14 +1,15 @@
-
 namespace BTCPayServer
 {
-    public class BSCBTCPayNetwork : BTCPayNetworkBase
+    public class BSCBTCPayNetwork : BTCPayNetwork
     {
         public int ChainId { get; set; }
         public int CoinType { get; set; }
 
+        public string PaymentMethodId;
+
         public string GetDefaultKeyPath()
         {
-            return $"m/44'/{CoinType}'/0'/0/x";
+            return $"m/44'/{CoinType}'/0'";
         }
     }
 
@@ -16,6 +17,4 @@ namespace BTCPayServer
     {
         public string SmartContractAddress { get; set; }
     }
-
 }
-

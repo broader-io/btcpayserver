@@ -1,8 +1,8 @@
 #if ALTCOINS
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Data;
@@ -11,31 +11,33 @@ using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Plugins.BSC.Configuration;
 using BTCPayServer.Services;
-using BTCPayServer.Services.Stores;
 using BTCPayServer.Services.Invoices;
+using BTCPayServer.Services.Stores;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using NBitcoin;
+using Nethereum.RPC.Eth.DTOs;
+using Nethereum.Web3;
 
 namespace BTCPayServer.Plugins.BSC.Services
 {
     public class BSCService : EventHostedServiceBase
     {
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly EventAggregator _eventAggregator;
         private readonly StoreRepository _storeRepository;
         private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
         private readonly SettingsRepository _settingsRepository;
         private readonly InvoiceRepository _invoiceRepository;
         private readonly IConfiguration _configuration;
         private readonly PaymentService _paymentService;
-        private readonly Dictionary<int, BSCWatcher> _chainHostedServices = new Dictionary<int, BSCWatcher>();
+
+        private readonly Dictionary<int, Dictionary<Type, BSCBaseHostedService>> _chainHostedServices =
+            new Dictionary<int, Dictionary<Type, BSCBaseHostedService>>();
+
+        private readonly Web3Wrapper _web3Wrapper;
 
         private readonly Dictionary<int, CancellationTokenSource> _chainHostedServiceCancellationTokenSources =
             new Dictionary<int, CancellationTokenSource>();
 
         public BSCService(
-            IHttpClientFactory httpClientFactory,
             EventAggregator eventAggregator,
             StoreRepository storeRepository,
             BTCPayNetworkProvider btcPayNetworkProvider,
@@ -45,8 +47,6 @@ namespace BTCPayServer.Plugins.BSC.Services
             PaymentService paymentService,
             Logs logs) : base(eventAggregator, logs)
         {
-            _httpClientFactory = httpClientFactory;
-            _eventAggregator = eventAggregator;
             _storeRepository = storeRepository;
             _btcPayNetworkProvider = btcPayNetworkProvider;
             _settingsRepository = settingsRepository;
@@ -55,10 +55,100 @@ namespace BTCPayServer.Plugins.BSC.Services
             _paymentService = paymentService;
         }
 
+        private async Task<List<BSCBaseHostedService>> InstantiateServicesForChain(int chainId)
+        {
+            var services = new List<BSCBaseHostedService>();
+
+            var settings = await GetSettings(chainId);
+
+            try
+            {
+
+                // var bscWatcher = new BSCInvoiceWatcher(
+                //     chainId,
+                //     _btcPayNetworkProvider,
+                //     _settingsRepository,
+                //     EventAggregator,
+                //     _invoiceRepository,
+                //     _paymentService,
+                //     Logs
+                // );
+                //services.Add(bscWatcher);
+
+                // var bscBalancePollingService = new BSCBalancePollingService(
+                //     chainId,
+                //     settings.GetHighPriorityPollingPeriod(),
+                //     _btcPayNetworkProvider,
+                //     _invoiceRepository,
+                //     _settingsRepository,
+                //     EventAggregator,
+                //     Logs
+                // );
+                // services.Add(bscBalancePollingService);
+
+                var bscTransactionPollerService = new BSCBEP20TransactionPollerService(
+                    chainId,
+                    settings.GetHighPriorityPollingPeriod(),
+                    _btcPayNetworkProvider,
+                    _invoiceRepository,
+                    _settingsRepository,
+                    EventAggregator,
+                    Logs
+                );
+                services.Add(bscTransactionPollerService);
+
+                var bscBlockPoller = new BSCBlockPoller(
+                    chainId,
+                    settings.GetBlockPollingPeriod(),
+                    _btcPayNetworkProvider,
+                    _settingsRepository,
+                    EventAggregator,
+                    Logs
+                );
+                services.Add(bscBlockPoller);
+                
+                var bSCPaymentService = new BSCPaymentService(
+                    chainId,
+                    settings.GetPaymentUpdatePollingPeriod(),
+                    _settingsRepository,
+                    _paymentService,
+                    EventAggregator,
+                    _btcPayNetworkProvider,
+                    _invoiceRepository,
+                    Logs
+                );
+                services.Add(bSCPaymentService);
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+
+            return services;
+        }
+
+        private void AddChainHostedService(
+            int chainId,
+            BSCBaseHostedService service)
+        {
+            if (!_chainHostedServices.ContainsKey(chainId))
+            {
+                _chainHostedServices.Add(chainId, new Dictionary<Type, BSCBaseHostedService>());
+            }
+
+            var services = _chainHostedServices[chainId];
+            services.AddOrReplace(service.GetType(), service);
+        }
+
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            var chainIds = _btcPayNetworkProvider.GetAll().OfType<BSCBTCPayNetwork>()
-                .Select(network => network.ChainId).Distinct().ToList();
+            var chainIds = _btcPayNetworkProvider
+                .GetAll()
+                .OfType<BSCBTCPayNetwork>()
+                .Select(network => network.ChainId)
+                .Distinct()
+                .ToList();
             if (!chainIds.Any())
             {
                 return;
@@ -69,7 +159,10 @@ namespace BTCPayServer.Plugins.BSC.Services
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    _eventAggregator.Publish(new CheckWatchers());
+                    //EventAggregator.Publish(new RestartChainServicesEvent());
+
+                    await RestartServices(cancellationToken);
+
                     await Task.Delay(IsAllAvailable() ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(5),
                         cancellationToken);
                 }
@@ -78,56 +171,50 @@ namespace BTCPayServer.Plugins.BSC.Services
 
         private static bool First = true;
 
-        private async Task LoopThroughChainWatchers(CancellationToken cancellationToken)
+        private async Task RestartServices(CancellationToken cancellationToken)
         {
-            var chainIds = _btcPayNetworkProvider.GetAll().OfType<BSCBTCPayNetwork>()
-                .Select(network => network.ChainId).Distinct().ToList();
+            var chainIds = _btcPayNetworkProvider
+                .GetAll()
+                .OfType<BSCBTCPayNetwork>()
+                .Select(network => network.ChainId)
+                .Distinct()
+                .ToList();
+
             foreach (var chainId in chainIds)
             {
                 try
                 {
-                    var settings = await _settingsRepository.GetSettingAsync<BSCConfiguration>(
-                        BSCConfiguration.SettingsKey(chainId));
-                    if (settings is null || string.IsNullOrEmpty(settings.Web3ProviderUrl))
-                    {
-                        var val = _configuration.GetValue<string>($"chain{chainId}_web3", null);
-                        var valUser = _configuration.GetValue<string>($"chain{chainId}_web3_user", null);
-                        var valPass = _configuration.GetValue<string>($"chain{chainId}_web3_password", null);
-                        if (val != null && First)
-                        {
-                            Logs.PayServer.LogInformation($"Setting eth chain {chainId} web3 to {val}");
-                            settings ??= new BSCConfiguration()
-                            {
-                                ChainId = chainId,
-                                Web3ProviderUrl = val,
-                                Web3ProviderPassword = valPass,
-                                Web3ProviderUsername = valUser
-                            };
-                            await _settingsRepository.UpdateSetting(settings,
-                                BSCConfiguration.SettingsKey(chainId));
-                        }
-                    }
-
                     var currentlyRunning = _chainHostedServices.ContainsKey(chainId);
                     if (!currentlyRunning)
                     {
-                        await HandleChainWatcher(settings, cancellationToken);
+                        await RestartChainServices(
+                            chainId,
+                            cancellationToken);
                     }
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    // ignored
+                    Console.WriteLine(e);
+                    throw e;
                 }
             }
 
             First = false;
+        }
+        
+        private async Task<BSCConfiguration> GetSettings(int chainId)
+        {
+            return await BSCConfiguration.GetInstance(
+                _settingsRepository,
+                chainId,
+                true);
         }
 
         public override Task StopAsync(CancellationToken cancellationToken)
         {
             foreach (var chainHostedService in _chainHostedServices.Values)
             {
-                chainHostedService.StopAsync(cancellationToken);
+                // chainHostedService.StopAsync(cancellationToken);
             }
 
             return base.StopAsync(cancellationToken);
@@ -140,8 +227,8 @@ namespace BTCPayServer.Plugins.BSC.Services
             //_eventAggregator.Subscribe<ReserveBSCAddress>(HandleReserveNextAddress);
 
             Subscribe<ReserveBSCAddress>();
-            Subscribe<SettingsChanged<BSCConfiguration>>();
-            Subscribe<CheckWatchers>();
+            // Subscribe<SettingsChanged<BSCConfiguration>>();
+            Subscribe<RestartChainServicesEvent>();
         }
 
         protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
@@ -153,49 +240,60 @@ namespace BTCPayServer.Plugins.BSC.Services
 
             if (evt is SettingsChanged<BSCConfiguration> settingsChangedBSCConfig)
             {
-                await HandleChainWatcher(settingsChangedBSCConfig.Settings, cancellationToken);
+                await RestartChainServices(
+                    settingsChangedBSCConfig.Settings.ChainId,
+                    cancellationToken);
             }
 
-            if (evt is CheckWatchers)
+            if (evt is RestartChainServicesEvent)
             {
-                await LoopThroughChainWatchers(cancellationToken);
+                await RestartServices(cancellationToken);
             }
 
             await base.ProcessEvent(evt, cancellationToken);
         }
 
-        private async Task HandleChainWatcher(BSCConfiguration BSCConfiguration,
+
+        //# TODO Return list of tasks
+
+        private async Task RestartChainServices(
+            int chainId,
             CancellationToken cancellationToken)
         {
-            if (BSCConfiguration is null)
+            if (_chainHostedServiceCancellationTokenSources.ContainsKey(chainId))
             {
-                return;
+                _chainHostedServiceCancellationTokenSources[chainId].Cancel();
+                _chainHostedServiceCancellationTokenSources.Remove(chainId);
             }
 
-            if (_chainHostedServiceCancellationTokenSources.ContainsKey(BSCConfiguration.ChainId))
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _chainHostedServiceCancellationTokenSources.AddOrReplace(chainId, cts);
+
+            if (_chainHostedServices.ContainsKey(chainId))
             {
-                _chainHostedServiceCancellationTokenSources[BSCConfiguration.ChainId].Cancel();
-                _chainHostedServiceCancellationTokenSources.Remove(BSCConfiguration.ChainId);
+                foreach (BSCBaseHostedService bscBaseHostedService in _chainHostedServices[chainId].Values)
+                {
+                    await bscBaseHostedService.StopAsync(cancellationToken);
+                    _chainHostedServices[chainId].Remove(bscBaseHostedService.GetType());
+                }
             }
 
-            if (_chainHostedServices.ContainsKey(BSCConfiguration.ChainId))
+            var services = await InstantiateServicesForChain(chainId);
+            foreach (BSCBaseHostedService bscBaseHostedService in services)
             {
-                //await _chainHostedServices[BSCConfiguration.ChainId].StopAsync(cancellationToken);
-                _chainHostedServices[BSCConfiguration.ChainId].StopAsync(cancellationToken);
-                _chainHostedServices.Remove(BSCConfiguration.ChainId);
-            }
-
-            if (!string.IsNullOrWhiteSpace(BSCConfiguration.Web3ProviderUrl))
-            {
-                var cts = new CancellationTokenSource();
-                _chainHostedServiceCancellationTokenSources.AddOrReplace(BSCConfiguration.ChainId, cts);
-                _chainHostedServices.AddOrReplace(BSCConfiguration.ChainId,
-                    new BSCWatcher(BSCConfiguration.ChainId, BSCConfiguration,
-                        _btcPayNetworkProvider, _eventAggregator, _invoiceRepository, _paymentService, Logs));
-                await _chainHostedServices[BSCConfiguration.ChainId].StartAsync(CancellationTokenSource
-                    .CreateLinkedTokenSource(cancellationToken, cts.Token).Token);
+                AddChainHostedService(chainId, bscBaseHostedService);
+                try
+                {
+                    await bscBaseHostedService
+                        .StartAsync(cts.Token);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
             }
         }
+
 
         private async Task HandleReserveNextAddress(ReserveBSCAddress reserveBSCAddress)
         {
@@ -203,40 +301,35 @@ namespace BTCPayServer.Plugins.BSC.Services
             var a = store.GetSupportedPaymentMethods(_btcPayNetworkProvider);
             var BSCSupportedPaymentMethod = store.GetSupportedPaymentMethods(_btcPayNetworkProvider)
                 .OfType<BSCSupportedPaymentMethod>()
-                .SingleOrDefault(method => 
+                .SingleOrDefault(method =>
                     method.PaymentId.CryptoCode.ToUpperInvariant() == reserveBSCAddress.CryptoCode.ToUpperInvariant());
             if (BSCSupportedPaymentMethod == null)
             {
-                _eventAggregator.Publish(new ReserveBSCAddressResponse()
-                {
-                    OpId = reserveBSCAddress.OpId, Failed = true
-                });
+                EventAggregator.Publish(new ReserveBSCAddressResponse() {OpId = reserveBSCAddress.OpId, Failed = true});
                 return;
             }
 
             BSCSupportedPaymentMethod.CurrentIndex++;
             var address = BSCSupportedPaymentMethod.GetDerivedAddress()?
-                .Invoke((int)BSCSupportedPaymentMethod.CurrentIndex);
+                .Invoke(BSCSupportedPaymentMethod.CurrentIndex);
 
             if (string.IsNullOrEmpty(address))
             {
-                _eventAggregator.Publish(new ReserveBSCAddressResponse()
-                {
-                    OpId = reserveBSCAddress.OpId, Failed = true
-                });
+                EventAggregator.Publish(new ReserveBSCAddressResponse() {OpId = reserveBSCAddress.OpId, Failed = true});
                 return;
             }
+
             store.SetSupportedPaymentMethod(BSCSupportedPaymentMethod.PaymentId,
                 BSCSupportedPaymentMethod);
             await _storeRepository.UpdateStore(store);
-            _eventAggregator.Publish(new ReserveBSCAddressResponse()
+            EventAggregator.Publish(new ReserveBSCAddressResponse()
             {
                 Address = address,
                 Index = BSCSupportedPaymentMethod.CurrentIndex,
                 CryptoCode = BSCSupportedPaymentMethod.CryptoCode,
                 OpId = reserveBSCAddress.OpId,
                 StoreId = reserveBSCAddress.StoreId,
-                XPub = BSCSupportedPaymentMethod.XPub
+                XPub = BSCSupportedPaymentMethod.AccountDerivation
             });
         }
 
@@ -244,14 +337,14 @@ namespace BTCPayServer.Plugins.BSC.Services
         {
             address.OpId = string.IsNullOrEmpty(address.OpId) ? Guid.NewGuid().ToString() : address.OpId;
             var tcs = new TaskCompletionSource<ReserveBSCAddressResponse>();
-            var subscription = _eventAggregator.Subscribe<ReserveBSCAddressResponse>(response =>
+            var subscription = EventAggregator.Subscribe<ReserveBSCAddressResponse>(response =>
             {
                 if (response.OpId == address.OpId)
                 {
                     tcs.SetResult(response);
                 }
             });
-            _eventAggregator.Publish(address);
+            EventAggregator.Publish(address);
 
             if (tcs.Task.Wait(TimeSpan.FromSeconds(60)))
             {
@@ -263,7 +356,7 @@ namespace BTCPayServer.Plugins.BSC.Services
             return null;
         }
 
-        public class CheckWatchers
+        public class RestartChainServicesEvent
         {
             public override string ToString()
             {
@@ -311,9 +404,11 @@ namespace BTCPayServer.Plugins.BSC.Services
             var chainId = _btcPayNetworkProvider.GetNetwork<BSCBTCPayNetwork>(networkCryptoCode)?.ChainId;
             if (chainId != null && _chainHostedServices.TryGetValue(chainId.Value, out var watcher))
             {
-                error = watcher.GlobalError;
-                return string.IsNullOrEmpty(watcher.GlobalError);
+                //error = watcher.GlobalError;
+                //return string.IsNullOrEmpty(watcher.GlobalError);
+                return true;
             }
+
             return false;
         }
     }

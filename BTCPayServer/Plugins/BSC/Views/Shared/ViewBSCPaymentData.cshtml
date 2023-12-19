@@ -1,33 +1,38 @@
 @using System.Globalization
 @using BTCPayServer.Plugins.BSC
 @using BTCPayServer.Plugins.BSC.Controllers
+@using Nethereum.RPC.Eth.DTOs
 @model IEnumerable<BTCPayServer.Services.Invoices.PaymentEntity>
 
 @{
-    var onchainPayments = Model.Where(entity => entity.GetPaymentMethodId().PaymentType == BSCPaymentType.Instance).Select(payment =>
-    {
-        var m = new BSCPaymentViewModel();
-        var onChainPaymentData = payment.GetCryptoPaymentData() as BSCPaymentData;
-        m.Crypto = payment.GetPaymentMethodId().CryptoCode;
-        m.DepositAddress = onChainPaymentData.GetDestination();
+    var onchainPayments = Model
+        .Where(entity => entity.GetPaymentMethodId().PaymentType == BSCPaymentType.Instance)
+        .Select(payment =>
+        {
+            var m = new BSCPaymentViewModel();
+            var onChainPaymentData = payment.GetCryptoPaymentData() as BSCPaymentData;
 
-        m.Amount = onChainPaymentData.GetValue().ToString(CultureInfo.InvariantCulture);
-        m.Confirmations = onChainPaymentData.BlockNumber.HasValue ? $"{onChainPaymentData.ConfirmationCount} (block {onChainPaymentData.BlockNumber})" : "pending";
-        m.Amount = onChainPaymentData.GetValue().ToString(CultureInfo.InvariantCulture);
-        m.BlockNumber = onChainPaymentData.BlockNumber;
-        m.ReceivedTime = payment.ReceivedTime;
-        m.BalanceLink = string.Format(CultureInfo.InvariantCulture, payment.Network.BlockExplorerLink, m.DepositAddress);
-        m.Replaced = !payment.Accounted;
-        m.Index = onChainPaymentData.AccountIndex;
-        return m;
-    });
+
+            m.Crypto = payment.GetPaymentMethodId().CryptoCode;
+            m.DepositAddress = onChainPaymentData.GetDestination();
+
+            m.Amount = onChainPaymentData.GetValue().ToString(CultureInfo.InvariantCulture);
+            m.Confirmations = onChainPaymentData.ConfirmationCount;
+            m.Amount = onChainPaymentData.GetValue().ToString(CultureInfo.InvariantCulture);
+            m.BlockParameter = onChainPaymentData.BlockParameter;
+            m.ReceivedTime = payment.ReceivedTime;
+            m.BalanceLink = string.Format(CultureInfo.InvariantCulture, payment.Network.BlockExplorerLink, m.DepositAddress);
+            m.Replaced = !payment.Accounted;
+            //m.Index = onChainPaymentData.AccountIndex;
+            return m;
+        });
 }
 
 @if (onchainPayments.Any())
 {
     <div class="row">
         <div class="col-md-12 invoice-payments">
-            <h3>BSC/ERC-20 payments</h3>
+            <h3>BSC/BEP-20 payments</h3>
             <table class="table table-sm table-responsive-lg">
                 <thead class="thead-inverse">
                 <tr>
@@ -41,7 +46,6 @@
                 <tbody>
                 @foreach (var payment in onchainPayments)
                 {
-                    
                     <tr style="@(payment.Replaced ? "text-decoration: line-through" : "")">
                         <td>@payment.Crypto</td>
                         <td>@payment.Amount</td>

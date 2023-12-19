@@ -1,5 +1,9 @@
 
 
+BlockNumbers must by of type BlockParameter because when a transaction is first created, 
+it doesn't have a block assigned, so it's value is BlockParameter.pending.
+
+
 // mainnet
 const web3 = new Web3('https://bsc-dataseed1.binance.org:443');
 // testnet

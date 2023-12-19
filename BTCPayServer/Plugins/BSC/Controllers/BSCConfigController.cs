@@ -52,7 +52,7 @@ namespace BTCPayServer.Plugins.BSC.Controllers
         [HttpGet("{chainId}/cb")]
         public IActionResult Callback(int chainId)
         {
-            _eventAggregator.Publish(new BSCService.CheckWatchers());
+            _eventAggregator.Publish(new BSCService.RestartChainServicesEvent());
             TempData.SetStatusMessageModel(new StatusMessageModel()
             {
                 Message = "If the invoice was paid successfully and confirmed, the system will be enabled momentarily"

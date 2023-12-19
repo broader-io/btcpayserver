@@ -2,52 +2,36 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Events;
-using BTCPayServer.HostedServices;
+using BTCPayServer.Logging;
 using BTCPayServer.Payments;
-using BTCPayServer.Plugins.BSC.Configuration;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using Microsoft.Extensions.Logging;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.StandardTokenEIP20.ContractDefinition;
-using Nethereum.Web3;
 
 namespace BTCPayServer.Plugins.BSC.Services
 {
-    public class BSCWatcher : EventHostedServiceBase
+    public class BSCInvoiceWatcher : BSCBaseHostedService
     {
         //LimitedConcurrencyLevelTaskScheduler lcts = new LimitedConcurrencyLevelTaskScheduler(50);
 
-        
-        private readonly EventAggregator _eventAggregator;
         private readonly InvoiceRepository _invoiceRepository;
         private readonly PaymentService _paymentService;
-        private int ChainId { get; }
-        private readonly HashSet<PaymentMethodId> PaymentMethods;
+        private readonly HashSet<PaymentMethodId> _paymentMethods;
 
-        private readonly Web3 Web3;
-        private readonly List<BSCBTCPayNetwork> Networks;
-        public string GlobalError { get; private set; } = "The chain watcher is still starting.";
-        
         private CancellationTokenSource _Cts;
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            Logs.PayServer.LogDebug($"Starting BSCWatcher for chain {ChainId}");
-            var result = await Web3.Eth.ChainId.SendRequestAsync();
-            if (result.Value != ChainId)
-            {
-                GlobalError =
-                    $"The web3 client is connected to a different chain id. Expected {ChainId} but Web3 returned {result.Value}";
-                return;
-            }
+            Logs.PayServer.LogDebug($"Starting BSCWatcher for chain {_chainId}");
 
             await base.StartAsync(cancellationToken);
-            GlobalError = null;
+            await StartLoop(cancellationToken);
 
             _Cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _ = StartLoop(_Cts.Token);
@@ -58,7 +42,7 @@ namespace BTCPayServer.Plugins.BSC.Services
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                _eventAggregator.Publish(new CatchUp());
+                EventAggregator.Publish(new CatchUp());
                 await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
             }
         }
@@ -68,24 +52,22 @@ namespace BTCPayServer.Plugins.BSC.Services
             Subscribe<BSCService.ReserveBSCAddressResponse>();
             Subscribe<BSCAddressBalanceFetched>();
             Subscribe<CatchUp>();
-            base.SubscribeToEvents();
         }
 
         protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             if (evt is BSCAddressBalanceFetched response)
             {
-                
                 //Thread.Sleep(1000);
-                
-                if (response.ChainId != ChainId)
+
+                if (response.ChainId != _chainId)
                 {
                     return;
                 }
 
-                var network = Networks.SingleOrDefault(payNetwork =>
+                var network = _networks.SingleOrDefault(payNetwork =>
                     payNetwork.CryptoCode.Equals(response.CryptoCode, StringComparison.InvariantCultureIgnoreCase));
 
                 if (network is null)
@@ -108,15 +90,11 @@ namespace BTCPayServer.Plugins.BSC.Services
                     {
                         Address = response.Address,
                         CryptoCode = response.CryptoCode,
-                        Amount = response.Amount,
+                        Value = response.Amount,
                         Network = network,
-                        BlockNumber =
-                            response.BlockParameter.ParameterType == BlockParameter.BlockParameterType.blockNumber
-                                ? (long?)response.BlockParameter.BlockNumber.Value
-                                : (long?)null,
+                        BlockParameter = response.BlockParameter,
                         ConfirmationCount = 0,
-                        AccountIndex = response.PaymentMethodDetails.Index,
-                        XPub = response.PaymentMethodDetails.XPub
+                        KeyPath = response.PaymentMethodDetails.KeyPath
                     };
                     var payment = await _paymentService.AddPayment(invoice.Id, DateTimeOffset.UtcNow,
                         paymentData, network, true);
@@ -126,7 +104,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                 {
                     var cd = (BSCPaymentData)existingPayment.GetCryptoPaymentData();
                     //existing payment amount was changed. Set to unaccounted and register as a new payment.
-                    if (response.Amount == 0 || response.Amount != cd.Amount)
+                    if (response.Amount == 0 || response.Amount != cd.Value)
                     {
                         existingPayment.Accounted = false;
 
@@ -137,72 +115,67 @@ namespace BTCPayServer.Plugins.BSC.Services
                             {
                                 Address = response.Address,
                                 CryptoCode = response.CryptoCode,
-                                Amount = response.Amount,
+                                Value = response.Amount,
                                 Network = network,
-                                BlockNumber =
-                                    response.BlockParameter.ParameterType ==
-                                    BlockParameter.BlockParameterType.blockNumber
-                                        ? (long?)response.BlockParameter.BlockNumber.Value
-                                        : null,
+                                BlockParameter = response.BlockParameter,
                                 ConfirmationCount =
                                     response.BlockParameter.ParameterType ==
                                     BlockParameter.BlockParameterType.blockNumber
                                         ? 1
                                         : 0,
-                                
-                                AccountIndex = cd.AccountIndex,
-                                XPub = cd.XPub
+                                KeyPath = cd.KeyPath
                             };
                             var payment = await _paymentService.AddPayment(invoice.Id, DateTimeOffset.UtcNow,
                                 paymentData, network, true);
                             if (payment != null) ReceivedPayment(invoice, payment);
                         }
                     }
-                    else if (response.Amount == cd.Amount)
+                    else if (response.Amount == cd.Value)
                     {
                         //transition from pending to 1 confirmed
-                        if (cd.BlockNumber is null && response.BlockParameter.ParameterType ==
+                        if (
+                            cd.BlockParameter.ParameterType == BlockParameter.BlockParameterType.pending 
+                            && response.BlockParameter.ParameterType ==
                             BlockParameter.BlockParameterType.blockNumber)
                         {
                             cd.ConfirmationCount = 1;
-                            cd.BlockNumber = (long?)response.BlockParameter.BlockNumber.Value;
+                            cd.BlockParameter = response.BlockParameter;
 
                             existingPayment.SetCryptoPaymentData(cd);
                             await _paymentService.UpdatePayments(new List<PaymentEntity>() {existingPayment});
 
-                            _eventAggregator.Publish(new Events.InvoiceNeedUpdateEvent(invoice.Id));
+                            EventAggregator.Publish(new InvoiceNeedUpdateEvent(invoice.Id));
                         }
                         //increment confirm count
                         else if (response.BlockParameter.ParameterType ==
                                  BlockParameter.BlockParameterType.blockNumber)
                         {
-                            if (response.BlockParameter.BlockNumber.Value > cd.BlockNumber.Value)
-                            {
-                                cd.ConfirmationCount =
-                                    (long)(response.BlockParameter.BlockNumber.Value - cd.BlockNumber.Value);
-                            }
-                            else
-                            {
-                                cd.BlockNumber = (long?)response.BlockParameter.BlockNumber.Value;
-                                cd.ConfirmationCount = 1;
-                            }
+                            // if (response.BlockParameter.BlockNumber.Value > cd.BlockParameter)
+                            // {
+                            //     cd.ConfirmationCount =
+                            //         (long)(response.BlockParameter.BlockNumber.Value - cd.BlockParameter);
+                            // }
+                            // else
+                            // {
+                            //     cd.BlockParameter = (long)response.BlockParameter.BlockNumber.Value;
+                            //     cd.ConfirmationCount = 1;
+                            // }
 
                             existingPayment.SetCryptoPaymentData(cd);
                             await _paymentService.UpdatePayments(new List<PaymentEntity>() {existingPayment});
 
-                            _eventAggregator.Publish(new Events.InvoiceNeedUpdateEvent(invoice.Id));
+                            EventAggregator.Publish(new InvoiceNeedUpdateEvent(invoice.Id));
                         }
                     }
                 }
             }
-            
+
             if (evt is CatchUp)
             {
                 //DateTimeOffset start = DateTimeOffset.Now;
 
-                await Task.Run( async () =>
+                await Task.Run(async () =>
                 {
-
                     //while (true)
                     {
                         try
@@ -213,7 +186,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                             //_ = await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ContinueWith(task =>
                             //{
                             Logs.PayServer.LogDebug("Running CatchUp");
-                            //_eventAggregator.Publish(new CatchUp());
+                            EventAggregator.Publish(new CatchUp());
                             //return Task.CompletedTask;
                             //}, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Current);
                         }
@@ -252,13 +225,14 @@ namespace BTCPayServer.Plugins.BSC.Services
             var strInvoiceIds = invoiceIds.Select(i => i.Id).ToArray();
             var invoices = await _invoiceRepository.GetInvoices(new InvoiceQuery() {InvoiceId = strInvoiceIds});
             invoices = invoices
-                .Where(entity => PaymentMethods.Any(id => entity.GetPaymentMethod(id)?.GetPaymentMethodDetails()?.Activated is true))
+                .Where(entity =>
+                    _paymentMethods.Any(id => entity.GetPaymentMethod(id)?.GetPaymentMethodDetails()?.Activated is true))
                 .ToArray();
 
             await UpdatePaymentStates(invoices, cancellationToken);
         }
 
-        private long? LastBlock = null;
+        private BlockParameter? LastBlock = null;
 
         private async Task UpdatePaymentStates(InvoiceEntity[] invoices, CancellationToken cancellationToken)
         {
@@ -267,19 +241,21 @@ namespace BTCPayServer.Plugins.BSC.Services
                 return;
             }
 
-            var currentBlock = await Web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            var currentBlock = await _web3.GetLatestBlockNumber();
 
-            foreach (var network in Networks)
+            foreach (var network in _networks)
             {
                 var paymentMethodId = new PaymentMethodId(network.CryptoCode, BSCPaymentType.Instance);
                 var expandedInvoices = invoices
                     .Select(entity => (
                         Invoice: entity,
                         PaymentMethodDetails: entity.GetPaymentMethods().TryGet(paymentMethodId),
-                        ExistingPayments: entity.GetPayments(network, true).Select(paymentEntity => (Payment: paymentEntity,
+                        ExistingPayments: entity.GetPayments(network, true).Select(paymentEntity => (
+                            Payment: paymentEntity,
                             PaymentData: (BSCPaymentData)paymentEntity.GetCryptoPaymentData(),
                             Invoice: entity))
-                    )).Where(tuple => tuple.PaymentMethodDetails?.GetPaymentMethodDetails()?.Activated is true).ToList();
+                    )).Where(tuple => tuple.PaymentMethodDetails?.GetPaymentMethodDetails()?.Activated is true)
+                    .ToList();
 
                 var existingPaymentData = expandedInvoices.SelectMany(tuple =>
                     tuple.ExistingPayments.Where(valueTuple => valueTuple.Payment.Accounted)).ToList();
@@ -288,29 +264,28 @@ namespace BTCPayServer.Plugins.BSC.Services
                     tuple.ExistingPayments.All(valueTuple => !valueTuple.Payment.Accounted)).ToList();
 
                 var tasks = new List<Task>();
-                if (existingPaymentData.Any() && currentBlock.Value != LastBlock)
+                if (existingPaymentData.Any() && currentBlock != LastBlock)
                 {
                     Logs.PayServer.LogDebug(
                         $"Checking {existingPaymentData.Count} existing payments on {expandedInvoices.Count} invoices on {network.CryptoCode}");
-                    var blockParameter = new BlockParameter(currentBlock);
 
                     tasks.Add(Task.WhenAll(existingPaymentData.Select(async tuple =>
                     {
-                        var bal = await GetBalance(network, blockParameter, tuple.PaymentData.Address);
+                        var bal = await _web3.GetBalance(tuple.PaymentData.Address, network);
 
-                        _eventAggregator.Publish(new BSCAddressBalanceFetched()
+                        EventAggregator.Publish(new BSCAddressBalanceFetched()
                         {
                             Address = tuple.PaymentData.Address,
                             CryptoCode = network.CryptoCode,
                             Amount = bal,
                             MatchedExistingPayment = tuple.Payment,
-                            BlockParameter = blockParameter,
-                            ChainId = ChainId,
+                            BlockParameter = currentBlock,
+                            ChainId = _chainId,
                             InvoiceEntity = tuple.Invoice,
                         });
                     })).ContinueWith(task =>
                     {
-                        LastBlock = (long?)currentBlock.Value;
+                        LastBlock = currentBlock;
                     }, TaskScheduler.Current));
                 }
 
@@ -321,18 +296,19 @@ namespace BTCPayServer.Plugins.BSC.Services
                     var blockParameter = BlockParameter.CreatePending();
                     tasks.AddRange(noAccountedPaymentInvoices.Select(async tuple =>
                     {
-                        var bal = await GetBalance(network, blockParameter,
-                            tuple.PaymentMethodDetails.GetPaymentMethodDetails().GetPaymentDestination());
-                        _eventAggregator.Publish(new BSCAddressBalanceFetched()
+                        var address = tuple.PaymentMethodDetails.DepositAddress;
+                        var bal = await _web3.GetBalance(address, network);
+                        EventAggregator.Publish(new BSCAddressBalanceFetched()
                         {
-                            Address = tuple.PaymentMethodDetails.GetPaymentMethodDetails().GetPaymentDestination(),
+                            Address = address,
                             CryptoCode = network.CryptoCode,
                             Amount = bal,
                             MatchedExistingPayment = null,
                             BlockParameter = blockParameter,
-                            ChainId = ChainId,
+                            ChainId = _chainId,
                             InvoiceEntity = tuple.Invoice,
-                            PaymentMethodDetails = (BSCOnChainPaymentMethodDetails) tuple.PaymentMethodDetails.GetPaymentMethodDetails()
+                            PaymentMethodDetails =
+                                (BSCPaymentMethodDetails)tuple.PaymentMethodDetails.GetPaymentMethodDetails()
                         });
                     }));
                 }
@@ -347,66 +323,42 @@ namespace BTCPayServer.Plugins.BSC.Services
             public int ChainId { get; set; }
             public string Address { get; set; }
             public string CryptoCode { get; set; }
-            public long Amount { get; set; }
+            public BigInteger Amount { get; set; }
             public InvoiceEntity InvoiceEntity { get; set; }
             public PaymentEntity MatchedExistingPayment { get; set; }
-            public BSCOnChainPaymentMethodDetails PaymentMethodDetails { get; set; }
+            public BSCPaymentMethodDetails PaymentMethodDetails { get; set; }
 
             public override string ToString()
             {
-                return "";            
+                return "";
             }
         }
 
         private void ReceivedPayment(InvoiceEntity invoice, PaymentEntity payment)
         {
-            _eventAggregator.Publish(
+            EventAggregator.Publish(
                 new InvoiceEvent(invoice, InvoiceEvent.ReceivedPayment) {Payment = payment});
         }
 
-        private async Task<long> GetBalance(BSCBTCPayNetwork network, BlockParameter blockParameter,
-            string address)
-        {
-            if (network is BEP20BTCPayNetwork bep20BTCPayNetwork)
-            {
-                return (long)(await Web3.Eth.GetContractHandler(bep20BTCPayNetwork.SmartContractAddress)
-                    .QueryAsync<BalanceOfFunction, BigInteger>(new BalanceOfFunction() {Owner = address}));
-            }
-            else
-            {
-                return (long)(await Web3.Eth.GetBalance.SendRequestAsync(address, blockParameter)).Value;
-            }
-        }
-
-        public BSCWatcher(int chainId, BSCConfiguration config,
+        public BSCInvoiceWatcher(
+            int chainId,
             BTCPayNetworkProvider btcPayNetworkProvider,
-            EventAggregator eventAggregator, InvoiceRepository invoiceRepository, PaymentService paymentService,
-            BTCPayServer.Logging.Logs logs) :
-            base(eventAggregator, logs)
+            SettingsRepository settingsRepository,
+            EventAggregator eventAggregator,
+            InvoiceRepository invoiceRepository,
+            PaymentService paymentService,
+            Logs logs) :
+            base(
+                chainId,
+                eventAggregator,
+                settingsRepository,
+                btcPayNetworkProvider,
+                logs)
         {
-            _eventAggregator = eventAggregator;
             _invoiceRepository = invoiceRepository;
             _paymentService = paymentService;
-            ChainId = chainId;
-            AuthenticationHeaderValue headerValue = null;
-            if (!string.IsNullOrEmpty(config.Web3ProviderUsername))
-            {
-                var val = config.Web3ProviderUsername;
-                if (!string.IsNullOrEmpty(config.Web3ProviderUsername))
-                {
-                    val += $":{config.Web3ProviderUsername}";
-                }
-                
-                headerValue = new AuthenticationHeaderValue(
-                    "Basic", Convert.ToBase64String(
-                        System.Text.Encoding.ASCII.GetBytes(val)));
-            }
-            Web3 = new Web3(config.Web3ProviderUrl, null, headerValue);
-            Networks = btcPayNetworkProvider.GetAll()
-                .OfType<BSCBTCPayNetwork>()
-                .Where(network => network.ChainId == chainId)
-                .ToList();
-            PaymentMethods = Networks
+
+            _paymentMethods = _networks
                 .Select(network => new PaymentMethodId(network.CryptoCode, BSCPaymentType.Instance))
                 .ToHashSet();
         }

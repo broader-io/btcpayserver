@@ -18,22 +18,24 @@ namespace BTCPayServer
 
         public override CryptoPaymentData DeserializePaymentData(BTCPayNetworkBase network, string str)
         {
-            return JsonConvert.DeserializeObject<BSCPaymentData>(str);
+            var data = ((BTCPayNetwork)network).ToObject<BSCPaymentData>(str);
+            data.CryptoCode = network.CryptoCode;
+            return data;
         }
 
         public override string SerializePaymentData(BTCPayNetworkBase network, CryptoPaymentData paymentData)
         {
-            return JsonConvert.SerializeObject(paymentData);
+            return ((BTCPayNetwork)network).ToString((BSCPaymentData)paymentData);
         }
 
         public override IPaymentMethodDetails DeserializePaymentMethodDetails(BTCPayNetworkBase network, string str)
         {
-            return JsonConvert.DeserializeObject<BSCOnChainPaymentMethodDetails>(str);
+            return ((BTCPayNetwork)network).ToObject<BSCPaymentMethodDetails>(str);
         }
 
         public override string SerializePaymentMethodDetails(BTCPayNetworkBase network, IPaymentMethodDetails details)
         {
-            return JsonConvert.SerializeObject(details);
+            return ((BTCPayNetwork)network).ToString((BSCPaymentMethodDetails)details);
         }
 
         public override ISupportedPaymentMethod DeserializeSupportedPaymentMethod(BTCPayNetworkBase network, JToken value)
@@ -59,7 +61,7 @@ namespace BTCPayServer
             {
                 return new
                 {
-                    BSCSupportedPaymentMethod.XPub
+                    //accountDerivation = BSCSupportedPaymentMethod.AccountDerivation
                     //no clue what all those properties saved are and don't care.
                 };
             }
