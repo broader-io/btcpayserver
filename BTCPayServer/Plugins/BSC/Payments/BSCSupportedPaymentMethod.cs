@@ -63,7 +63,14 @@ namespace BTCPayServer.Plugins.BSC
         public int GetAccountNumber()
         {
             string KeyPath = AccountKeySettings[0].AccountKeyPath;
-            
+            var parts = KeyPath.Split("/");
+            var accountNumber = parts[3];
+            return Int32.Parse(accountNumber);
+        }
+
+        public string GetKeyPath()
+        {
+            return AccountKeySettings[0].AccountKeyPath;
         }
 
         public Func<int, string> GetDerivedAddress()

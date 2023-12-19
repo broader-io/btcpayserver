@@ -89,9 +89,9 @@ namespace BTCPayServer.Plugins.BSC.Controllers
                 AccountDerivation = matchedPaymentMethod?.AccountDerivation,
                 Index = matchedPaymentMethod?.CurrentIndex ?? 0,
                 OriginalIndex = matchedPaymentMethod?.CurrentIndex ?? 0,
-                AccountKeyPath = string.IsNullOrEmpty(matchedPaymentMethod?.AccountKeyPath)
+                AccountKeyPath = string.IsNullOrEmpty(matchedPaymentMethod?.GetKeyPath())
                     ? network.GetDefaultKeyPath()
-                    : matchedPaymentMethod?.AccountKeyPath,
+                    : matchedPaymentMethod?.GetKeyPath(),
                 RootAddress = matchedPaymentMethod?.GetDerivedAddress()?.Invoke(0) ?? "not configured"
             });
         }

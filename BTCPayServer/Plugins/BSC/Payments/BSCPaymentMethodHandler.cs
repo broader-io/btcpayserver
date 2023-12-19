@@ -61,7 +61,7 @@ namespace BTCPayServer.Plugins.BSC
                 throw new PaymentMethodUnavailableException($"could not generate address");
             }
 
-            var accountNumber = supportedSupportedPaymentMethod.AccountKeyPath.Split("/")[0];
+            var accountNumber = supportedSupportedPaymentMethod.GetAccountNumber();
 
             var web3 = await Web3Wrapper.GetInstance(network.ChainId, _settingsRepository);
             var fee = await web3.GetNextFeeRate(network);
