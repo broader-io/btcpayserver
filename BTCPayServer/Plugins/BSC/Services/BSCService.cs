@@ -1,7 +1,6 @@
 #if ALTCOINS
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,8 +14,6 @@ using BTCPayServer.Services.Invoices;
 using BTCPayServer.Services.Stores;
 using Microsoft.Extensions.Configuration;
 using NBitcoin;
-using Nethereum.RPC.Eth.DTOs;
-using Nethereum.Web3;
 
 namespace BTCPayServer.Plugins.BSC.Services
 {
@@ -26,16 +23,17 @@ namespace BTCPayServer.Plugins.BSC.Services
         private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
         private readonly SettingsRepository _settingsRepository;
         private readonly InvoiceRepository _invoiceRepository;
-        private readonly IConfiguration _configuration;
         private readonly PaymentService _paymentService;
 
         private readonly Dictionary<int, Dictionary<Type, BSCBaseHostedService>> _chainHostedServices =
-            new Dictionary<int, Dictionary<Type, BSCBaseHostedService>>();
+            new();
 
         private readonly Web3Wrapper _web3Wrapper;
 
         private readonly Dictionary<int, CancellationTokenSource> _chainHostedServiceCancellationTokenSources =
-            new Dictionary<int, CancellationTokenSource>();
+            new();
+
+        private static Semaphore _addressSemaphore;
 
         public BSCService(
             EventAggregator eventAggregator,
@@ -51,8 +49,9 @@ namespace BTCPayServer.Plugins.BSC.Services
             _btcPayNetworkProvider = btcPayNetworkProvider;
             _settingsRepository = settingsRepository;
             _invoiceRepository = invoiceRepository;
-            _configuration = configuration;
             _paymentService = paymentService;
+
+            _addressSemaphore = new Semaphore(initialCount: 1, maximumCount: 1);
         }
 
         private async Task<List<BSCBaseHostedService>> InstantiateServicesForChain(int chainId)
@@ -63,7 +62,6 @@ namespace BTCPayServer.Plugins.BSC.Services
 
             try
             {
-
                 // var bscWatcher = new BSCInvoiceWatcher(
                 //     chainId,
                 //     _btcPayNetworkProvider,
@@ -88,7 +86,7 @@ namespace BTCPayServer.Plugins.BSC.Services
 
                 var bscTransactionPollerService = new BSCBEP20TransactionPollerService(
                     chainId,
-                    settings.GetHighPriorityPollingPeriod(),
+                    settings.GetBlockPollingPeriod(),
                     _btcPayNetworkProvider,
                     _invoiceRepository,
                     _settingsRepository,
@@ -106,7 +104,7 @@ namespace BTCPayServer.Plugins.BSC.Services
                     Logs
                 );
                 services.Add(bscBlockPoller);
-                
+
                 var bSCPaymentService = new BSCPaymentService(
                     chainId,
                     settings.GetPaymentUpdatePollingPeriod(),
@@ -118,7 +116,6 @@ namespace BTCPayServer.Plugins.BSC.Services
                     Logs
                 );
                 services.Add(bSCPaymentService);
-
             }
             catch (Exception e)
             {
@@ -201,7 +198,7 @@ namespace BTCPayServer.Plugins.BSC.Services
 
             First = false;
         }
-        
+
         private async Task<BSCConfiguration> GetSettings(int chainId)
         {
             return await BSCConfiguration.GetInstance(
@@ -298,20 +295,22 @@ namespace BTCPayServer.Plugins.BSC.Services
         private async Task HandleReserveNextAddress(ReserveBSCAddress reserveBSCAddress)
         {
             var store = await _storeRepository.FindStore(reserveBSCAddress.StoreId);
-            var a = store.GetSupportedPaymentMethods(_btcPayNetworkProvider);
-            var BSCSupportedPaymentMethod = store.GetSupportedPaymentMethods(_btcPayNetworkProvider)
+            var bscSupportedPaymentMethod = store
+                .GetSupportedPaymentMethods(_btcPayNetworkProvider)
                 .OfType<BSCSupportedPaymentMethod>()
                 .SingleOrDefault(method =>
                     method.PaymentId.CryptoCode.ToUpperInvariant() == reserveBSCAddress.CryptoCode.ToUpperInvariant());
-            if (BSCSupportedPaymentMethod == null)
+
+            if (bscSupportedPaymentMethod == null)
             {
                 EventAggregator.Publish(new ReserveBSCAddressResponse() {OpId = reserveBSCAddress.OpId, Failed = true});
                 return;
             }
 
-            BSCSupportedPaymentMethod.CurrentIndex++;
-            var address = BSCSupportedPaymentMethod.GetDerivedAddress()?
-                .Invoke(BSCSupportedPaymentMethod.CurrentIndex);
+            var index = await GetNextIndex(store, bscSupportedPaymentMethod);
+
+            var address = bscSupportedPaymentMethod.GetDerivedAddress()
+                .Invoke(index);
 
             if (string.IsNullOrEmpty(address))
             {
@@ -319,18 +318,30 @@ namespace BTCPayServer.Plugins.BSC.Services
                 return;
             }
 
-            store.SetSupportedPaymentMethod(BSCSupportedPaymentMethod.PaymentId,
-                BSCSupportedPaymentMethod);
-            await _storeRepository.UpdateStore(store);
             EventAggregator.Publish(new ReserveBSCAddressResponse()
             {
                 Address = address,
-                Index = BSCSupportedPaymentMethod.CurrentIndex,
-                CryptoCode = BSCSupportedPaymentMethod.CryptoCode,
+                Index = bscSupportedPaymentMethod.CurrentIndex,
+                CryptoCode = bscSupportedPaymentMethod.CryptoCode,
                 OpId = reserveBSCAddress.OpId,
                 StoreId = reserveBSCAddress.StoreId,
-                XPub = BSCSupportedPaymentMethod.AccountDerivation
+                XPub = bscSupportedPaymentMethod.AccountDerivation
             });
+        }
+
+        private async Task<int> GetNextIndex(
+            StoreData store,
+            BSCSupportedPaymentMethod bscSupportedPaymentMethod)
+        {
+            _addressSemaphore.WaitOne();
+            var index = bscSupportedPaymentMethod.CurrentIndex + 1;
+            bscSupportedPaymentMethod.CurrentIndex = index;
+            store.SetSupportedPaymentMethod(
+                bscSupportedPaymentMethod.PaymentId,
+                bscSupportedPaymentMethod);
+            await _storeRepository.UpdateStore(store);
+            _addressSemaphore.Release();
+            return index;
         }
 
         public async Task<ReserveBSCAddressResponse> ReserveNextAddress(ReserveBSCAddress address)

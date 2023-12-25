@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Logging;
 using BTCPayServer.Services;
+using Microsoft.Extensions.Logging;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 
@@ -11,33 +12,42 @@ namespace BTCPayServer.Plugins.BSC.Services;
 
 public class BSCBlockPoller : BSCBasePollingService
 {
-
     private BigInteger _previousBlock;
-    
+    private readonly object _lockObject = new();
+
+
     public BSCBlockPoller(
-        int chainId, 
-        TimeSpan pollInterval, 
-        BTCPayNetworkProvider btcPayNetworkProvider, 
-        SettingsRepository settingsRepository, 
-        EventAggregator eventAggregator, 
-        Logs logs) : 
+        int chainId,
+        TimeSpan pollInterval,
+        BTCPayNetworkProvider btcPayNetworkProvider,
+        SettingsRepository settingsRepository,
+        EventAggregator eventAggregator,
+        Logs logs) :
         base(chainId, pollInterval, btcPayNetworkProvider, settingsRepository, eventAggregator, logs)
     {
     }
 
     protected override async Task PollingCallback(BSCBTCPayNetwork network, CancellationToken cancellationToken)
     {
-        var currentBlock = (await _web3.GetLatestBlockNumber()).BlockNumber.Value;
-        
-        while (_previousBlock <= currentBlock)
+        try
         {
-            _previousBlock++;
-
-            EventAggregator.Publish(new NewBlockEvent
+            var currentBlock = (await _web3.GetLatestBlockNumber()).BlockNumber.Value;
+            lock (_lockObject)
             {
-                chainId = _chainId,
-                blockParameter = new BlockParameter(new HexBigInteger(_previousBlock))
-            });
+                while (_previousBlock < currentBlock)
+                {
+                    _previousBlock++;
+
+                    EventAggregator.Publish(new NewBlockEvent
+                    {
+                        ChainId = _chainId, BlockParameter = new BlockParameter(new HexBigInteger(_previousBlock))
+                    });
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Logs.PayServer.LogError($"Error processing new blocks: {e.Message}");
         }
     }
 
@@ -54,7 +64,7 @@ public class BSCBlockPoller : BSCBasePollingService
 
     public class NewBlockEvent
     {
-        public int chainId;
-        public BlockParameter blockParameter;
+        public int ChainId;
+        public BlockParameter BlockParameter;
     }
 }

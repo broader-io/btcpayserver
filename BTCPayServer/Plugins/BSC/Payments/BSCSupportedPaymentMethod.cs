@@ -18,53 +18,23 @@ namespace BTCPayServer.Plugins.BSC
         [JsonProperty(PropertyName = "accountDerivation")]
         public string AccountDerivation { get; set; }
         
-        
-
+        [JsonProperty(PropertyName = "currentIndex")]
         public int CurrentIndex { get; set; }
 
+        [JsonProperty(PropertyName = "cryptoCode")]
         public string CryptoCode { get; set; }
 
-        [JsonIgnore] public PaymentMethodId PaymentId => new(CryptoCode, BSCPaymentType.Instance);
+        [JsonIgnore] 
+        public PaymentMethodId PaymentId => new(CryptoCode, BSCPaymentType.Instance);
 
-
-        // public BSCSupportedPaymentMethod (string accountDerivation, string accountKeyPath, BTCPayNetwork network)
-        // {
-        //     SigningKey = accountDerivation;
-        //     IsHotWallet = accountDerivation;
-        //     AccountOriginal = accountDerivation;
-        //     AccountDerivation = accountDerivation;
-        //     AccountKeyPath = accountKeyPath;
-        //     CurrentIndex = 0;
-        //     CryptoCode = network.CryptoCode;
-        //
-        //     // var DerivationStrategy = new DirectDerivationStrategy(
-        //     //     new BitcoinExtPubKey(AccountDerivation, NBitcoin.Network.Main),
-        //     //     false, null
-        //     // );
-        //     
-        //     // ArgumentNullException.ThrowIfNull(network);
-        //     // ArgumentNullException.ThrowIfNull(DerivationStrategy);
-        //     //AccountDerivation = DerivationStrategy;
-        //     Network = network;
-        //
-        // }
-
-        public AccountKeySettings[] AccountKeySettings = new AccountKeySettings[]{};
-        // {
-        //     get
-        //     {
-        //         return new[]
-        //         {
-        //             new AccountKeySettings() {AccountKey = AccountDerivation, AccountKeyPath = AccountKeyPath}
-        //         };
-        //     }
-        // }
+        [JsonProperty(PropertyName = "accountKeySettings")]
+        public AccountKeySettings[] AccountKeySettings = {};
 
         public int GetAccountNumber()
         {
             string KeyPath = AccountKeySettings[0].AccountKeyPath;
             var parts = KeyPath.Split("/");
-            var accountNumber = parts[3];
+            var accountNumber = parts[3].Replace("'", "");
             return Int32.Parse(accountNumber);
         }
 
@@ -117,7 +87,7 @@ namespace BTCPayServer.Plugins.BSC
 
     public class AccountKeySettings
     {
-        //public HDFingerprint? RootFingerprint { get; set; }
+        [JsonProperty(PropertyName = "accountKeyPath")]
         public string AccountKeyPath { get; set; }
 
         public RootedKeyPath GetRootedKeyPath()
@@ -127,6 +97,7 @@ namespace BTCPayServer.Plugins.BSC
             return null;
         }
 
+        [JsonProperty(PropertyName = "accountKey")]
         public string AccountKey { get; set; }
         // public bool IsFullySetup()
         // {

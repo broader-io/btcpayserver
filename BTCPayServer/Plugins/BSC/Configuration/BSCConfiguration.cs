@@ -128,11 +128,6 @@ namespace BTCPayServer.Plugins.BSC.Configuration
                 settings,
                 SettingsKey(chainId));
 
-            var web3Utils = new Web3Wrapper(
-                chainId,
-                settingsRepository
-            );
-
             return settings;
         }
 

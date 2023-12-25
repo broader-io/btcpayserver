@@ -16,7 +16,9 @@ using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using System.Numerics;
+using System.Threading;
 using Nethereum.Contracts.Standards.ERC20.ContractDefinition;
+using Nethereum.JsonRpc.Client;
 
 namespace BTCPayServer.Plugins.BSC.Services;
 
@@ -25,6 +27,9 @@ public class Web3Wrapper
     private int _chainId;
     private Web3 _web3;
     private SettingsRepository _settingsRepository;
+    
+    private static Semaphore _blockSemaphore = new Semaphore(initialCount: 0, maximumCount: 1);
+    private static Web3Wrapper _web3Wrapper;
 
     public Web3Wrapper(
         int chainId,
@@ -32,15 +37,23 @@ public class Web3Wrapper
     {
         _chainId = chainId;
         _settingsRepository = settingsRepository;
+
+        Console.WriteLine("Releasing semaphore");
+        _blockSemaphore.Release();
     }
 
     public static async Task<Web3Wrapper> GetInstance(
         int chainId,
         SettingsRepository settingsRepository)
     {
-        var web3Wrapper = new Web3Wrapper(chainId, settingsRepository);
-        await web3Wrapper.Reload();
-        return web3Wrapper;
+        if (_web3Wrapper == null)
+        {
+            var web3Wrapper = new Web3Wrapper(chainId, settingsRepository);
+            await web3Wrapper.Reload();
+            _web3Wrapper = web3Wrapper;
+        }
+
+        return _web3Wrapper;
     }
 
     public async Task Reload()
@@ -94,8 +107,16 @@ public class Web3Wrapper
 
     public async Task<BlockParameter> GetLatestBlockNumber()
     {
-        var block = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
-        return new BlockParameter(block);
+        _blockSemaphore.WaitOne();
+        try
+        {
+            var block = await _web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            return new BlockParameter(block);
+        }
+        finally
+        {
+            _blockSemaphore.Release();
+        }
     }
     
     public async Task<long> GetLatestBlockNumberLong()

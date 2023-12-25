@@ -19,24 +19,25 @@ namespace BTCPayServer.Plugins.BSC
     {
         public BigInteger Value { get; set; }
         public string KeyPath { get; set; }
-        
+
         [JsonConverter(typeof(BlockParameterJsonConverter))]
         public BlockParameter BlockParameter { get; set; }
+
         public string Address { get; set; }
         public string AddressFrom { get; set; }
         public long ConfirmationCount { get; set; }
-        
+
         //DATA, 32 Bytes - hash of the transaction.
         public string TransactionHash { get; set; }
-        
+
         public string ContractAddress { get; set; }
-        
+
         //integer of the transactions index position in the block. null when its pending.
         public BigInteger TransactionIndex { get; set; }
-        
+
         //The transaction type.
         public BigInteger TransactionType { get; set; }
-        
+
         //hash of the block where this transaction was in. null when its pending.
         public string BlockHash { get; set; }
 
@@ -105,8 +106,6 @@ namespace BTCPayServer.Plugins.BSC
             throw new NotImplementedException();
         }
     }
-    
-    
 }
 
 public class BlockParameterJsonConverter : JsonConverter<BlockParameter>
@@ -116,11 +115,11 @@ public class BlockParameterJsonConverter : JsonConverter<BlockParameter>
         writer.WriteStartObject();
         writer.WritePropertyName("ParameterType");
         writer.WriteValue(value.ParameterType.ToString());
-        
+
         writer.WritePropertyName("BlockNumber");
         if (value.ParameterType == BlockParameter.BlockParameterType.blockNumber)
         {
-            writer.WriteValue(value.BlockNumber);
+            writer.WriteValue(value.BlockNumber.Value);
         }
         else
         {
@@ -131,48 +130,58 @@ public class BlockParameterJsonConverter : JsonConverter<BlockParameter>
     }
 
     public override BlockParameter? ReadJson(
-        JsonReader reader, 
-        Type objectType, 
-        BlockParameter? existingValue, 
+        JsonReader reader,
+        Type objectType,
+        BlockParameter? existingValue,
         bool hasExistingValue,
         JsonSerializer serializer)
     {
-        var blockParameter = new BlockParameter();
-        
+        string parameterType = null;
+        string blockNumber = null;
+
         while (reader.Read())
         {
             if (reader.TokenType == JsonToken.EndObject)
             {
                 break;
             }
+
             if (reader.TokenType != JsonToken.PropertyName)
             {
                 throw new JsonException("Expecting TokenType as first property name");
             }
 
-            string propertyName = reader.ReadAsString();
+            string propertyName = (string)reader.Value;
             if (propertyName == "ParameterType")
             {
-                string parameterType = reader.ReadAsString();
-                if (parameterType == "blockNumber")
-                {
-                    string blockNumber = reader.ReadAsString();
-                    if (blockNumber == null)
-                    {
-                        throw new JsonException("BlockNumber cannot be null when ParameterType=blockNumber");
-                    }
-                    blockParameter.SetValue(BigInteger.Parse(blockNumber));                    
-                }
-                else
-                {
-                    if(!Enum.TryParse(parameterType, out BlockParameter.BlockParameterType value))
-                    {
-                        throw new JsonException(
-                            $"Unable to convert \"{propertyName}\" to Enum \"BlockParameterType\".");
-                    }
-                    blockParameter.SetValue(value);
-                }
+                parameterType = reader.ReadAsString();
             }
+            else if (propertyName == "BlockNumber")
+            {
+                blockNumber = reader.ReadAsString();
+            }
+        }
+
+        var blockParameter = new BlockParameter();
+        if (!Enum.TryParse(parameterType, out BlockParameter.BlockParameterType value))
+        {
+            throw new JsonException(
+                $"Unable to convert \"{parameterType}\" to Enum \"BlockParameterType\".");
+        }
+
+        if (value == BlockParameter.BlockParameterType.blockNumber)
+        {
+            if (blockNumber == null)
+            {
+                throw new JsonException(
+                    $"Block number cannot be null when parameterType \"{parameterType}\" is of type \"blockNumber\".");
+            }
+
+            blockParameter.SetValue(BigInteger.Parse(blockNumber));
+        }
+        else
+        {
+            blockParameter.SetValue(value);
         }
 
         return blockParameter;

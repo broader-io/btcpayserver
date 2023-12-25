@@ -11,6 +11,8 @@ const web3 = new Web3('https://data-seed-prebsc-1-s1.binance.org:8545');
 
 # Wprosus contract
 0x56f86cfa34cf4004736554c2784d59e477589c8c
+# Testnet
+0xe6F47738F66256b8C230f99852CBfAf96d3C02D4
 
 # WBNB address
 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c

@@ -9,6 +9,7 @@ using BTCPayServer.Logging;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using Microsoft.Extensions.Logging;
+using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 
@@ -45,7 +46,7 @@ public class BSCBEP20TransactionPollerService : BSCBasePollingService
 
     private async Task ProcessTransactionHeartBeat(BEP20BTCPayNetwork network)
     {
-        Console.WriteLine($"Heartbeat, addresses {_addresses.Count}, pending blocks: {_pendingBlocks.Count}");
+        //Console.WriteLine($"Heartbeat, addresses {_addresses.Count}, pending blocks: {_pendingBlocks.Count}");
         try
         {
             if (_addresses.Count == 0)
@@ -57,70 +58,108 @@ public class BSCBEP20TransactionPollerService : BSCBasePollingService
             {
                 var transferEventHandler = _web3.GetTransferEventDTOEvent(network.SmartContractAddress);
 
-                var copy = _pendingBlocks.ToArray();
-                long initialBlock = (long)copy.Min(b => b.BlockNumber.Value);
-                long endBlock = (long)copy.Max(b => b.BlockNumber.Value);
+                long initialBlock = -1;
+                long endBlock = -1;
+                lock (_pendingBlocks) // We don't want _pendingBlocks to change while we get min/max.
+                {
+                    var copy = _pendingBlocks.ToArray();
+                    initialBlock = (long)copy.Min(b => b.BlockNumber.Value);
+                    endBlock = (long)copy.Max(b => b.BlockNumber.Value);
+                    _pendingBlocks = new();
+                }
 
-                Console.WriteLine($"Processing block range: {initialBlock}-{endBlock}");
+                //Console.WriteLine($"Processing block range: {initialBlock}-{endBlock}");
 
                 Logs.PayServer.LogDebug($"Processing transactions from block: {initialBlock} to {endBlock}");
 
-                var rangeSize = Math.Max(1, Math.Min(
-                    _settings.TransactionPollerRange,
-                    endBlock - initialBlock));
-                for (long i = endBlock; i >= initialBlock; i -= rangeSize)
+                if (endBlock == initialBlock)
                 {
-                    var filterInput = transferEventHandler.CreateFilterInput(
+                    await ProcessBlocks(
+                        new BlockParameter(new HexBigInteger(initialBlock)),
                         null,
-                        _addresses.ToArray(),
-                        new BlockParameter(new HexBigInteger(new BigInteger(i - rangeSize))),
-                        new BlockParameter(new HexBigInteger(i)));
+                        transferEventHandler,
+                        network
+                    );
+                }
 
-                    var allTransferEventsForContract =
-                        await transferEventHandler.GetAllChangesAsync(filterInput);
-                    if (allTransferEventsForContract != null && allTransferEventsForContract.Count > 0)
-                    {
-                        Logs.PayServer.LogDebug($"Received {allTransferEventsForContract.Count} transactions");
+                var rangeSize = Math.Min(
+                    _settings.TransactionPollerRange,
+                    endBlock - initialBlock);
 
-                        allTransferEventsForContract.ForEach(e =>
-                        {
-                            var evt = e.Event;
-                            var log = e.Log;
+                for (long i = endBlock; i > initialBlock; i -= rangeSize)
+                {
+                    var endBlockParameter = new BlockParameter(new HexBigInteger(i));
 
-                            Console.WriteLine($"Received payment for {evt.To}");
-                            Console.WriteLine($"BlockNumber: {log.BlockNumber.Value}");
-                            Console.WriteLine($"TX: {log.TransactionHash}");
+                    var initBlockParamNum = Math.Max(i - rangeSize, initialBlock);
+                    var initBlockParameter =
+                        new BlockParameter(new HexBigInteger(new BigInteger(initBlockParamNum)));
 
-                            EventAggregator.Publish(new NewBSCTransactionEvent
-                            {
-                                Network = network,
-                                From = evt.From,
-                                To = evt.To,
-                                Value = evt.Value,
-                                ContractAddress = log.Address,
-                                BlockHash = log.BlockHash,
-                                BlockNumber = log.BlockNumber,
-                                LogIndex = log.LogIndex,
-                                Topics = log.Topics,
-                                TransactionHash = log.TransactionHash,
-                                TransactionIndex = log.TransactionIndex
-                            });
-                        });
-                    }
-
-                    await _web3.UpdateLastSeenBlockNumberSettings(i);
+                    await ProcessBlocks(
+                        initBlockParameter,
+                        endBlockParameter,
+                        transferEventHandler,
+                        network
+                    );
 
                     await Task.Delay(500);
                 }
 
                 await _web3.UpdateLastSeenBlockNumberSettings(endBlock);
-                _pendingBlocks = new();
             }
         }
 
         catch (Exception e)
         {
             Console.WriteLine(e);
+        }
+    }
+
+    private async Task ProcessBlocks(
+        BlockParameter start,
+        BlockParameter end,
+        Event<Web3Wrapper.TransferEventDTO> transferEventHandler,
+        BEP20BTCPayNetwork network)
+    {
+        var endBlockNumber = (end != null) ? end.BlockNumber.Value.ToString() : "latest";
+        Console.WriteLine($"Fetching blocks between: {start.BlockNumber.Value} and {endBlockNumber}");
+
+        var filterInput = transferEventHandler.CreateFilterInput(
+            null,
+            _addresses.ToArray(),
+            start,
+            end);
+
+        var allTransferEventsForContract =
+            await transferEventHandler.GetAllChangesAsync(filterInput);
+
+        if (allTransferEventsForContract != null && allTransferEventsForContract.Count > 0)
+        {
+            Logs.PayServer.LogDebug($"Received {allTransferEventsForContract.Count} transactions");
+
+            allTransferEventsForContract.ForEach(e =>
+            {
+                var evt = e.Event;
+                var log = e.Log;
+
+                Console.WriteLine($"Received payment for {evt.To}");
+                Console.WriteLine($"BlockNumber: {log.BlockNumber.Value}");
+                Console.WriteLine($"TX: {log.TransactionHash}");
+
+                EventAggregator.Publish(new NewBSCTransactionEvent
+                {
+                    Network = network,
+                    From = evt.From,
+                    To = evt.To,
+                    Value = evt.Value,
+                    ContractAddress = log.Address,
+                    BlockHash = log.BlockHash,
+                    BlockNumber = log.BlockNumber,
+                    LogIndex = log.LogIndex,
+                    Topics = log.Topics,
+                    TransactionHash = log.TransactionHash,
+                    TransactionIndex = log.TransactionIndex
+                });
+            });
         }
     }
 
@@ -137,9 +176,9 @@ public class BSCBEP20TransactionPollerService : BSCBasePollingService
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        if (evt is BSCBlockPoller.NewBlockEvent newBlockEvent && newBlockEvent.chainId == _chainId)
+        if (evt is BSCBlockPoller.NewBlockEvent newBlockEvent && newBlockEvent.ChainId == _chainId)
         {
-            _pendingBlocks.Add(newBlockEvent.blockParameter);
+            _pendingBlocks.Add(newBlockEvent.BlockParameter);
         }
         else if (evt is BSCBEP20TransactionPollerHeartBeat heartBeatEvent)
         {
