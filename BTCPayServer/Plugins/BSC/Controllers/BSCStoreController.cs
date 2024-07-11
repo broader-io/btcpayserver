@@ -293,7 +293,8 @@ namespace BTCPayServer.Plugins.BSC.Controllers
     {
         public string Label { get; set; }
 
-        [Display(Name = "XPUB")] public string AccountDerivation { get; set; }
+        [Display(Name = "XPUB")] 
+        public string AccountDerivation { get; set; }
         public string Seed { get; set; }
         public string Passphrase { get; set; }
 

@@ -72,6 +72,14 @@ namespace BTCPayServer
 
         public override T ToObject<T>(string json)
         {
+            try
+            {
+                return NBXplorerNetwork.Serializer.ToObject<T>(json);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
             return NBXplorerNetwork.Serializer.ToObject<T>(json);
         }
 

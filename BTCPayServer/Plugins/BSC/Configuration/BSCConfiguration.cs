@@ -74,6 +74,15 @@ namespace BTCPayServer.Plugins.BSC.Configuration
                     .GetSettingAsync<BSCConfiguration>(SettingsKey(ChainId));
             }
 
+            if (_instance == null)
+            {
+                _instance = await Create(
+                    ChainId,
+                    "", "", "",
+                    settingsRepository
+                    );
+            }
+
             return _instance;
         }
 

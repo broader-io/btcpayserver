@@ -62,27 +62,6 @@ namespace BTCPayServer.Plugins.BSC.Services
 
             try
             {
-                // var bscWatcher = new BSCInvoiceWatcher(
-                //     chainId,
-                //     _btcPayNetworkProvider,
-                //     _settingsRepository,
-                //     EventAggregator,
-                //     _invoiceRepository,
-                //     _paymentService,
-                //     Logs
-                // );
-                //services.Add(bscWatcher);
-
-                // var bscBalancePollingService = new BSCBalancePollingService(
-                //     chainId,
-                //     settings.GetHighPriorityPollingPeriod(),
-                //     _btcPayNetworkProvider,
-                //     _invoiceRepository,
-                //     _settingsRepository,
-                //     EventAggregator,
-                //     Logs
-                // );
-                // services.Add(bscBalancePollingService);
 
                 var bscTransactionPollerService = new BSCBEP20TransactionPollerService(
                     chainId,
